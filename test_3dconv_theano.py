@@ -20,6 +20,9 @@ def test_3dconv_theano(rng, conv_fun):
 
     # we might have to flip filters here, not sure ...
     filters_theano = filters[:,::-1,::-1,::-1,:]
+    ## :note: The GPU implementation is very slow. You are better to use
+    ## :func:`conv3d2d <theano.tensor.nnet.conv3d2d.conv3d>` that is faster
+    ## on GPU.
     conv_ref = theano.tensor.nnet.conv3D(V=inputs, W=filters_theano,
                                          b=bias, d=(1,1,1))
     f_ref = theano.function([], conv_ref)
