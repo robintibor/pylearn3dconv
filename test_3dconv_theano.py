@@ -29,7 +29,7 @@ def generate_test_data(rng):
     inputs = shared(inputs_val)
     filters = shared(filters_val)
     bias = shared(np.zeros(filters_shape[0]).astype('float32'))
-    #bias = shared(rng.normal(size=filters_shape[0]).astype('float32'))
+    bias = shared(rng.normal(size=filters_shape[0]).astype('float32'))
     return inputs, filters, bias
 
 def test_3dconv_theano(rng, conv_fun):

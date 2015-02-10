@@ -111,9 +111,12 @@ def vectorized_conv(X, W, b):
                  
     # Actual computation   
     result_mat = np.dot(filter_mat, inputs_flat)
-    # for reshape we first transpose the matrix 
+    # Add bias
+    # Also, for the reshape afterwards we first transpose the matrix 
     # (which is #filters x #flatoutputpoints)
     # so that filters are the second dimension and change slowest =>
     # correct H result matrix (note that num_filters is last dimension, not first)
-    H = np.reshape(result_mat.T,  (num_batches, out_height, out_width, out_duration, num_filters))
+    result_mat = result_mat.T + b
+    H = np.reshape(result_mat,  (num_batches, out_height, out_width, out_duration, num_filters))
+    
     return H
