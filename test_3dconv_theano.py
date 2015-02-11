@@ -59,10 +59,9 @@ def test_3dconv_theano(rng, conv_fun):
         print "ours"
         print res_ours
         print 'distance: ' + str(distance)
-        assert False
+        assert False, "distance greater than tolerance"
     else:
         print("Result within tolerance, distance {:f}".format(distance))
-
 
 if __name__ == "__main__":
     test_3dconv_theano(np.random, loop_conv)

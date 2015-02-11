@@ -60,9 +60,10 @@ def test_3dconv_img_filter(rng, conv_fun):
         print H_mat
         print 'max error: ' + str(max_err)
         assert False
+    else:
+        print("Result within tolerance, max err {:f}".format(max_err))
 
 
 if __name__ == "__main__":
-    #test_3dconv_img_filter(np.random, dummy_conv)
     test_3dconv_img_filter(np.random, loop_conv)
     test_3dconv_img_filter(np.random, vectorized_conv)

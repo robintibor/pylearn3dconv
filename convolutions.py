@@ -38,7 +38,6 @@ def loop_conv(X, W, b):
                                         input_val =  X[batch_i, out_x + filt_x, out_y + filt_y, out_z + filt_z, filt_chan_i]
                                         H[batch_i, out_x, out_y, out_z, filt_i] += \
                                              weight * input_val
-                                        
     return H
 
 def vectorized_conv(X, W, b):
@@ -46,7 +45,7 @@ def vectorized_conv(X, W, b):
     filt_height = W.shape[1]
     filt_width = W.shape[2]
     filt_duration = W.shape[3]
-    filter_channels = W.shape[4]
+    filt_channels = W.shape[4]
     num_batches = X.shape[0]
     in_height = X.shape[1]
     in_width = X.shape[2]
@@ -54,14 +53,14 @@ def vectorized_conv(X, W, b):
     in_channels = X.shape[4]
     # We assume filter always convolves directly over all channels =>
     # has size of input channels in channel dimension
-    assert(filter_channels == in_channels)
+    assert(filt_channels == in_channels)
     out_height = in_height - filt_height + 1
     out_width = in_width - filt_width + 1
     out_duration = in_duration - filt_duration + 1
     
     # Flatten filters into matrix #filters x #filterpoints
     filter_vec_length = filt_height * filt_width * filt_duration * \
-        filter_channels
+        filt_channels
     filter_mat = np.reshape(W, (num_filters, filter_vec_length))
 
     # Collect all flattened input into matrix 
@@ -81,7 +80,7 @@ def vectorized_conv(X, W, b):
                 input_part_flat = \
                     input_part.reshape((num_batches, filter_vec_length)).T
                 
-                # Now we have colums of flattened input, 
+                # Now we have columns of flattened input, 
                 # each column corresponding to one batch,
                 # e.g.for 2 batches and flat filter length of 3
                 # column 1 is for input 1 and column 2 is for input 2
@@ -114,9 +113,8 @@ def vectorized_conv(X, W, b):
     # Add bias
     # Also, for the reshape afterwards we first transpose the matrix 
     # (which is #filters x #flatoutputpoints)
-    # so that filters are the second dimension and change slowest =>
+    # so that filters are the second dimension and change fastest =>
     # correct H result matrix (note that num_filters is last dimension, not first)
     result_mat = result_mat.T + b
     H = np.reshape(result_mat,  (num_batches, out_height, out_width, out_duration, num_filters))
-    
     return H
