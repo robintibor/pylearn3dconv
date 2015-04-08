@@ -1,4 +1,48 @@
 import numpy as np
+import theano
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
+import theano.tensor.nnet.conv3d2d
+conv_mod = SourceModule(open('conv.cu').read())
+loop_conv_on_gpu_func = conv_mod.get_function("loop_conv")
+
+def loop_conv_on_gpu(inputs, filters, bias):
+    num_batches = inputs.shape[0]
+    out_height = inputs.shape[1] - filters.shape[1] + 1;
+    out_width = inputs.shape[2] - filters.shape[2] + 1;
+    out_duration = inputs.shape[3] - filters.shape[3] + 1;
+    num_filters = filters.shape[0]
+    output = np.zeros((num_batches, out_height, out_width, out_duration, 
+        num_filters)).astype(np.float32)
+    loop_conv_on_gpu_func(cuda.In(inputs), cuda.In(filters),
+        cuda.In(bias), cuda.InOut(output),
+        np.int32(inputs.shape[0]),np.int32(inputs.shape[1]),
+        np.int32(inputs.shape[2]),
+        np.int32(inputs.shape[3]),np.int32(inputs.shape[4]),
+        np.int32(filters.shape[0]),np.int32(filters.shape[1]),
+        np.int32(filters.shape[2]), np.int32(filters.shape[3]),
+        np.int32(filters.shape[4]),
+        block=(1,1,1))
+    return output
+    
+def create_theano_conv3d(inputs, filters, bias):
+    conv_theano_result = theano.tensor.nnet.conv3D(V=inputs, W=filters,
+                                         b=bias, d=(1,1,1))
+    conv_function = theano.function([], conv_theano_result)
+    return conv_function
+
+def create_theano_conv3d2d(inputs, filters_flipped, bias):
+    # dimshuffles to switch from
+    # theano conv3d:   batch x row  x column   x time x channels
+    # to 
+    # theano conv3d2d: batch x time x channels x row  x column
+    conv_result = theano.tensor.nnet.conv3d2d.conv3d(
+        signals=inputs.dimshuffle(0,3,4,1,2), 
+        filters=filters_flipped.dimshuffle(0,3,4,1,2))
+    conv_result = conv_result + bias.dimshuffle('x','x',0,'x','x')
+    conv_result = conv_result.dimshuffle(0,3,4,1,2)
+    conv_function = theano.function([], conv_result)
+    return conv_function
 
 def loop_conv(X, W, b):
     # Go over all five dimensions 

@@ -1,16 +1,16 @@
 import numpy as np
 import theano
-#from theano.sandbox.cuda import float32_shared_constructor as shared
+import theano.misc.pycuda_init
 from theano import shared
 from convolutions import loop_conv
 from convolutions import vectorized_conv
 from timeit import default_timer as timer
 import theano.tensor.nnet.conv3d2d
-from test_data import generate__theano_test_data
+from test_data import generate_theano_test_data
 
 def test_3dconv_theano(rng, conv_fun):
 
-    inputs, filters, bias = generate__theano_test_data(rng)
+    inputs, filters, bias = generate_theano_test_data(rng)
     ## :note: The GPU implementation is very slow. You are better to use
     ## :func:`conv3d2d <theano.tensor.nnet.conv3d2d.conv3d>` that is faster
     ## on GPU.
@@ -18,15 +18,18 @@ def test_3dconv_theano(rng, conv_fun):
     #    3D "convolution" of multiple filters on a minibatch
     #    (does not flip the kernel, moves kernel with a user specified stride)
    
+    
+    
+    #[Ns, Ts, C, Hs, Ws]
+    #conv_ref = theano.tensor.nnet.conv3D(V=inputs, W=filters,
+    #                                     b=bias, d=(1,1,1))
     # flipping from https://groups.google.com/forum/#!msg/theano-users/1S9_bZgHxVw/0cQR9a4riFUJ
-    #filters_flip = filters[:,::-1,:,::-1,::-1]  # flip time, width and height
-    #conv_ref = theano.tensor.nnet.conv3d2d.conv3d(signals=inputs, 
-    #                                    filters=filters_flip)
-    #conv_ref = conv_ref + bias.dimshuffle('x','x',0,'x','x')
-    
-    conv_ref = theano.tensor.nnet.conv3D(V=inputs, W=filters,
-                                         b=bias, d=(1,1,1))
-    
+    filters_flip = filters[:,::-1,::-1,::-1,:]  # flip width, height and time
+    conv_ref = theano.tensor.nnet.conv3d2d.conv3d(
+        signals=inputs.dimshuffle(0,3,4,1,2), 
+        filters=filters_flip.dimshuffle(0,3,4,1,2))
+    conv_ref = conv_ref + bias.dimshuffle('x','x',0,'x','x')
+    conv_ref = conv_ref.dimshuffle(0,3,4,1,2)
     f_ref = theano.function([], conv_ref)
     # compute the theano convolution
     start = timer()

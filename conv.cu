@@ -44,12 +44,6 @@ __global__ void loop_conv(float* input, float* filters,  float* bias,
                       float input_value = input[input_flat_i];
                       
                       output[output_flat_i] += weight * input_value;
-                      /*
-                        weight = W[filt_i, filt_x, filt_y, filt_z, filt_chan_i]
-                        input_val =  X[batch_i, out_x + filt_x, out_y + filt_y, out_z + filt_z, filt_chan_i]
-                        H[batch_i, out_x, out_y, out_z, filt_i] += \
-                             weight * input_val
-                             */
                     }
                   }
                 }

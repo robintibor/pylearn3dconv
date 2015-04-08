@@ -1,12 +1,14 @@
-import pycuda.driver as cuda
 import os
-from math import floor
+import pycuda.driver as cuda
 assert 'CUDA_DEVICE' in os.environ, "please set cuda device nr " + \
     "in environment for cluster"
 import pycuda.autoinit
 print("Using GPU Nr: {:d}".format(pycuda.autoinit.device.get_attribute(
     pycuda.driver.device_attribute.PCI_DEVICE_ID)))
+
 from pycuda.compiler import SourceModule
+
+from math import floor
 from test_data import generate_test_data
 import numpy as np
 from convolutions import vectorized_conv
