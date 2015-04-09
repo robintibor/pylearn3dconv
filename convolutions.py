@@ -4,10 +4,13 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 import theano.tensor.nnet.conv3d2d
 import cudamat
+from theano.sandbox.cuda.basic_ops import gpu_contiguous
 conv_mod = SourceModule(open('conv.cu').read())
 loop_conv_on_gpu_func = conv_mod.get_function("loop_conv")
 from timeit import default_timer as timer
 import theano.tensor as T
+from theano.sandbox.cuda.blas import GpuCorr3dMM
+import theano.sandbox.cuda.fftconv
 
 def compute_out_shape(inputs_shape, filters_shape):
     num_batches = inputs_shape[0]
@@ -32,10 +35,37 @@ def loop_conv_on_gpu(inputs, filters, bias):
         block=(1,1,1))
     return output
     
+def create_theano_blas_corr3d(inputs, filters, bias):
+    inputs = gpu_contiguous(inputs.dimshuffle(0,4,1,2,3))
+    filters = gpu_contiguous(filters.dimshuffle(0,4,1,2,3))
+    conv_result = GpuCorr3dMM()(inputs, filters)
+    conv_result = conv_result.dimshuffle(0,2,3,4,1)
+    conv_result = conv_result + bias.dimshuffle('x','x','x','x',0)
+    conv_function = theano.function([], conv_result)
+    return conv_function
+    
+
 def create_theano_conv3d(inputs, filters, bias):
     conv_theano_result = theano.tensor.nnet.conv3D(V=inputs, W=filters,
                                          b=bias, d=(1,1,1))
     conv_function = theano.function([], conv_theano_result)
+    return conv_function
+
+def create_theano_conv3d_real():
+    ftensor5 = T.TensorType('float32', (False,)*5)
+    inputs = ftensor5()
+    filters = ftensor5()
+    bias = T.fvector()
+    conv_theano_result = theano.tensor.nnet.conv3D(V=inputs, W=filters,
+                                         b=bias, d=(1,1,1))
+    conv_function = theano.function([inputs, filters, bias], 
+        conv_theano_result)
+    return conv_function
+
+def create_theano_conv3d_fft(inputs, filters, bias):
+    conv_result = theano.sandbox.cuda.fftconv.conv3d_fft(inputs, filters)
+    conv_result = conv_result + bias.dimshuffle('x','x','x','x',0)
+    conv_function = theano.function([], conv_result)
     return conv_function
 
 def create_theano_conv3d2d(inputs, filters_flipped, bias):
