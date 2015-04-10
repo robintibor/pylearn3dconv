@@ -149,7 +149,7 @@ class Conv3dElemwise(Layer):
 
         self.detector_space = Conv3DSpace(shape=output_shape,
                                           num_channels=self.output_channels,
-                                          axes=('b',  0, 1, 2, 'c'))
+                                          axes=self.conv_theano_op.op_axes)
 
         self.initialize_transformer(rng)
 
