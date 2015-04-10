@@ -2,7 +2,7 @@ from pylearn2.utils.rng import make_np_rng
 from pylearn2.utils import sharedX, wraps
 from pylearn2.models.mlp import Layer, BadInputSpaceError
 import logging
-from volumetric_space import Conv3DSpace
+from vol_conv.volumetric_space import Conv3DSpace
 import numpy as np
 import theano.tensor as T
 from theano.compat import OrderedDict

@@ -1,10 +1,10 @@
 from conv_3d import Conv3dElemwise
 import functools
-from theano.tensor.nnet.Conv3D import Conv3D
+import theano.tensor.nnet.conv3d2d
 from pylearn2.linear.linear_transform import LinearTransform as P2LT
 
-class Theano3dConv():
-    op_axes = ('b', 0, 1, 2, 'c')
+class Theano3d2dConv():
+    op_axes = ('b', 2, 'c', 0, 1)
     def __init__(self, filters, bias, input_space, output_axes):
         self.__dict__.update(locals())
 
@@ -17,7 +17,9 @@ class Theano3dConv():
             reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
             x = x.dimshuffle(*reshuffle_arr)
 
-        rval = Conv3D()(x, self.filters, self.bias, d=(1,1,1))
+        rval = theano.tensor.nnet.conv3d2d.conv3d(x, self.filters)
+        
+        rval = rval + self.bias.dimshuffle('x', 'x', 0, 'x', 'x')
 
         output_axes = self.output_axes
         assert len(output_axes) == 5
@@ -38,5 +40,5 @@ class Theano3dConv():
         return [self.filters, self.bias]
 
 
-class Theano3dConv3dElemwise(Conv3dElemwise):
-    conv_theano_op=Theano3dConv
+class Theano3d2dConv3dElemwise(Conv3dElemwise):
+    conv_theano_op=Theano3d2dConv
