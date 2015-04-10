@@ -1,7 +1,5 @@
-import functools
 from pylearn2.utils.rng import make_np_rng
 from pylearn2.utils import sharedX, wraps
-from theano.tensor.nnet.Conv3D import Conv3D
 from pylearn2.models.mlp import Layer, BadInputSpaceError
 import logging
 from volumetric_space import Conv3DSpace
@@ -10,43 +8,8 @@ import theano.tensor as T
 from theano.compat import OrderedDict
 
 logger = logging.getLogger(__name__)
-from pylearn2.linear.linear_transform import LinearTransform as P2LT
 
 default_seed = hash('tobipuma') % 4294967295 # good seed is important ;)
-
-class Theano3dConv():
-    op_axes = ('b', 0, 1, 2, 'c')
-    def __init__(self, filters, bias, input_space, output_axes):
-        self.__dict__.update(locals())
-
-    def lmul(self, x):
-        assert x.ndim == 5
-        input_axes = self.input_space.axes
-        assert len(input_axes) == 5
-        if tuple(input_axes) != self.op_axes:
-            # convert from input axes to op_axes
-            reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
-            x = x.dimshuffle(*reshuffle_arr)
-
-        rval = Conv3D()(x, self.filters, self.bias, d=(1,1,1))
-
-        output_axes = self.output_axes
-        assert len(output_axes) == 5
-
-        if tuple(output_axes) != self.op_axes:
-            # convert from op axes to output axes
-            reshuffle_arr = [self.op_axes.index(output_axes[i]) for i in xrange(5)]
-            rval = rval.dimshuffle(*reshuffle_arr)
-
-        return rval
-
-    @functools.wraps(P2LT.get_params)
-    def get_params(self):
-        """
-        .. todo::
-            WRITEME
-        """
-        return [self.filters, self.bias]
 
 def make_conv_3d(irange, input_space, output_space,
         kernel_shape, conv_op, init_bias=0., rng=None):
@@ -109,11 +72,12 @@ class Conv3dElemwise(Layer):
     
     """
 
+    conv_theano_op=None # should be overwritten by subclass
+
     def __init__(self,
                  output_channels,
                  kernel_shape,
-                 layer_name,
-                 conv_theano_op,
+                 layer_name,                 
                  nonlinearity,
                  irange,
                  init_bias=0.):
@@ -259,28 +223,20 @@ class Conv3dElemwise(Layer):
     @wraps(Layer.get_layer_monitoring_channels)
     def get_layer_monitoring_channels(self, state_below=None,
                                       state=None, targets=None):
-
         W, = self.transformer.get_params()
-
         assert W.ndim == 5
-
         sq_W = T.sqr(W)
-
         row_norms = T.sqrt(sq_W.sum(axis=(1, 2, 3, 4)))
-
         rval = OrderedDict([
                            ('kernel_norms_min', row_norms.min()),
                            ('kernel_norms_mean', row_norms.mean()),
                            ('kernel_norms_max', row_norms.max()),
                            ])
-
-        cst = self.cost
+        cost = self.cost
         orval = self.nonlin.get_monitoring_channels_from_state(state,
                                                                targets,
-                                                               cost_fn=cst)
-
+                                                               cost_fn=cost)
         rval.update(orval)
-
         return rval
 
     @wraps(Layer.fprop)
@@ -300,8 +256,3 @@ class Conv3dElemwise(Layer):
             d = self.output_normalization(d)
 
         return d
-
-class Theano3dConv3dElemwise(Conv3dElemwise):
-    def __init__(self, *args, **kwargs):
-        super(Theano3dConv3dElemwise, self).__init__(*args, 
-            conv_theano_op=Theano3dConv, **kwargs)
