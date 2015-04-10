@@ -12,9 +12,10 @@ from theano.compat import OrderedDict
 logger = logging.getLogger(__name__)
 from pylearn2.linear.linear_transform import LinearTransform as P2LT
 
-default_seed = 42764187 # some random number :)
+default_seed = hash('tobipuma') % 4294967295 # good seed is important ;)
 
 class Theano3dConv():
+    op_axes = ('b', 0, 1, 2, 'c')
     def __init__(self, filters, bias, input_space, output_axes):
         self.__dict__.update(locals())
 
@@ -22,25 +23,19 @@ class Theano3dConv():
         assert x.ndim == 5
         input_axes = self.input_space.axes
         assert len(input_axes) == 5
-
-        op_axes = ('b', 0, 1,  2, 'c')
-
-        if tuple(input_axes) != op_axes:
+        if tuple(input_axes) != self.op_axes:
             # convert from input axes to op_axes
-            reshuffle_arr = [input_axes.index(op_axes[i]) for i in xrange(5)]
+            reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
             x = x.dimshuffle(*reshuffle_arr)
 
-        #for now fakebias
-        #bias = T.fvector()
-        #bias = T.zeros_like(self.filters[:, 0,0,0,0]) 
         rval = Conv3D()(x, self.filters, self.bias, d=(1,1,1))
 
         output_axes = self.output_axes
         assert len(output_axes) == 5
 
-        if tuple(output_axes) != op_axes:
+        if tuple(output_axes) != self.op_axes:
             # convert from op axes to output axes
-            reshuffle_arr = [op_axes.index(output_axes[i]) for i in xrange(5)]
+            reshuffle_arr = [self.op_axes.index(output_axes[i]) for i in xrange(5)]
             rval = rval.dimshuffle(*reshuffle_arr)
 
         return rval
@@ -53,26 +48,35 @@ class Theano3dConv():
         """
         return [self.filters, self.bias]
 
-def make_theano_conv_3d(irange, input_space, output_space,
-        kernel_shape, init_bias=0., rng=None):
+def make_conv_3d(irange, input_space, output_space,
+        kernel_shape, conv_op, init_bias=0., rng=None):
     rng = make_np_rng(rng, default_seed, which_method='uniform')
-
-    # needs to correspond to expected shape of filters for 3d conv
-    # (out channel, row, column, time ,in channel) according to theano doc
-    weights_shape = (output_space.num_channels, kernel_shape[0], kernel_shape[1],
-            kernel_shape[2], input_space.num_channels)
+    weights_shape = _get_weights_shape(out_channels = output_space.num_channels,
+        kernel_shape=kernel_shape, in_channels=input_space.num_channels, 
+        conv_op_axes = conv_op.op_axes)
+    
     W = sharedX(rng.uniform(-irange, irange, weights_shape))
     bias = sharedX(np.zeros(weights_shape[0]).astype('float32') + init_bias)
-    return Theano3dConv(
+    return conv_op(
         filters=W,
         bias=bias,
         input_space=input_space,
         output_axes=output_space.axes,
     )
 
-
-
-
+def _get_weights_shape(out_channels, kernel_shape, in_channels, conv_op_axes):
+    """ Get shape of weights for given conv_op_axes
+    >>> _get_weights_shape(3, [4, 5, 6], 7, ('b', 0, 1, 2, 'c'))
+    [3, 4, 5, 6, 7]
+    >>> _get_weights_shape(3, [4, 5, 6], 7, ('b', 'c', 0, 1, 2))
+    [3, 7, 4, 5, 6]
+    """
+    # Use b 0 1 2 c shape and then shuffle it according to op axes 
+    weights_shape_b_0_1_2_c = [out_channels, kernel_shape[0], kernel_shape[1], 
+        kernel_shape[2], in_channels]
+    shuffle_arr = [['b', 0, 1, 2, 'c'].index(ax) for ax in conv_op_axes]
+    weights_shape = [weights_shape_b_0_1_2_c[i] for i in shuffle_arr]
+    return weights_shape
 
 class Conv3dElemwise(Layer):
     """
@@ -109,6 +113,7 @@ class Conv3dElemwise(Layer):
                  output_channels,
                  kernel_shape,
                  layer_name,
+                 conv_theano_op,
                  nonlinearity,
                  irange,
                  init_bias=0.):
@@ -129,11 +134,12 @@ class Conv3dElemwise(Layer):
             random number generator object.
         """
         assert self.irange is not None
-        self.transformer = make_theano_conv_3d(
+        self.transformer = make_conv_3d(
             irange=self.irange,
             input_space=self.input_space,
             output_space=self.detector_space,
             kernel_shape=self.kernel_shape,
+            conv_op=self.conv_theano_op,
             rng=rng)
 
     def initialize_output_space(self):
@@ -159,9 +165,7 @@ class Conv3dElemwise(Layer):
     @wraps(Layer.set_input_space)
     def set_input_space(self, space):
         """ Note: this function will reset the parameters! """
-
         self.input_space = space
-
         if not isinstance(space, Conv3DSpace):
             raise BadInputSpaceError(self.__class__.__name__ +
                                      ".set_input_space "
@@ -189,16 +193,8 @@ class Conv3dElemwise(Layer):
         W.name = self.layer_name + '_W'
         self.b = bias
         self.b.name = self.layer_name + '_b'
-        """
-        if self.tied_b:
-            
-        else:
-            self.b = sharedX(self.detector_space.get_origin() + self.init_bias)
-"""
-
         logger.info('Input shape: {0}'.format(self.input_space.shape))
         logger.info('Detector space: {0}'.format(self.detector_space.shape))
-
         self.initialize_output_space()
 
     @wraps(Layer.get_params)
@@ -289,33 +285,23 @@ class Conv3dElemwise(Layer):
 
     @wraps(Layer.fprop)
     def fprop(self, state_below):
-
         self.input_space.validate(state_below)
-
-        z = self.transformer.lmul(state_below)
-        """ ignore bias for now
-        if not hasattr(self, 'tied_b'):
-            self.tied_b = False
-
-        if self.tied_b:
-            b = self.b.dimshuffle('x', 0, 'x', 'x')
-        else:
-            b = self.b.dimshuffle('x', 0, 1, 2)
-
-        z = z + b
-        """
+        z = self.transformer.lmul(state_below) # will already apply bias
         d = self.nonlin.apply(z)
 
         if self.layer_name is not None:
             d.name = self.layer_name + '_z'
             self.detector_space.validate(d)
 
-        p = d
-
         if not hasattr(self, 'output_normalization'):
             self.output_normalization = None
 
         if self.output_normalization:
-            p = self.output_normalization(p)
+            d = self.output_normalization(d)
 
-        return p
+        return d
+
+class Theano3dConv3dElemwise(Conv3dElemwise):
+    def __init__(self, *args, **kwargs):
+        super(Theano3dConv3dElemwise, self).__init__(*args, 
+            conv_theano_op=Theano3dConv, **kwargs)
