@@ -35,51 +35,53 @@ def loop_conv_on_gpu(inputs, filters, bias):
         block=(1,1,1))
     return output
     
-def create_theano_blas_corr3d(inputs, filters, bias):
-    inputs = gpu_contiguous(inputs.dimshuffle(0,4,1,2,3))
-    filters = gpu_contiguous(filters.dimshuffle(0,4,1,2,3))
-    conv_result = GpuCorr3dMM()(inputs, filters)
+def create_theano_blas_corr3d():
+    inputs, filters, bias = get_theano_input()
+    inputs_shuffled = gpu_contiguous(inputs.dimshuffle(0,4,1,2,3))
+    filters_shuffled = gpu_contiguous(filters.dimshuffle(0,4,1,2,3))
+    conv_result = GpuCorr3dMM()(inputs_shuffled, filters_shuffled)
     conv_result = conv_result.dimshuffle(0,2,3,4,1)
     conv_result = conv_result + bias.dimshuffle('x','x','x','x',0)
-    conv_function = theano.function([], conv_result)
-    return conv_function
-    
-
-def create_theano_conv3d(inputs, filters, bias):
-    conv_theano_result = theano.tensor.nnet.conv3D(V=inputs, W=filters,
-                                         b=bias, d=(1,1,1))
-    conv_function = theano.function([], conv_theano_result)
+    conv_function = theano.function([inputs, filters, bias], conv_result)
     return conv_function
 
-def create_theano_conv3d_real():
-    ftensor5 = T.TensorType('float32', (False,)*5)
-    inputs = ftensor5()
-    filters = ftensor5()
-    bias = T.fvector()
-    conv_theano_result = theano.tensor.nnet.conv3D(V=inputs, W=filters,
-                                         b=bias, d=(1,1,1))
-    conv_function = theano.function([inputs, filters, bias], 
-        conv_theano_result)
+def create_theano_conv3d():
+    inputs, filters, bias = get_theano_input()
+    conv_result = theano.tensor.nnet.conv3D(inputs, filters, bias, d=(1,1,1))
+    conv_function = theano.function([inputs, filters, bias], conv_result)
     return conv_function
 
-def create_theano_conv3d_fft(inputs, filters, bias):
-    conv_result = theano.sandbox.cuda.fftconv.conv3d_fft(inputs, filters)
+def create_theano_conv3d_fft():
+    inputs, filters, bias = get_theano_input()
+    inputs_shuffled = inputs.dimshuffle(0,4,1,2,3)
+    filters_shuffled = filters.dimshuffle(0,4,1,2,3)
+    conv_result = theano.sandbox.cuda.fftconv.conv3d_fft(inputs_shuffled, 
+        filters_shuffled, pad_last_dim=True)
+    conv_result = conv_result.dimshuffle(0,2,3,4,1)
     conv_result = conv_result + bias.dimshuffle('x','x','x','x',0)
-    conv_function = theano.function([], conv_result)
+    conv_function = theano.function([inputs, filters, bias], conv_result)
     return conv_function
 
-def create_theano_conv3d2d(inputs, filters_flipped, bias):
+def create_theano_conv3d2d():
+    inputs, filters, bias = get_theano_input()
     # dimshuffles to switch from
     # theano conv3d:   batch x row  x column   x time x channels
     # to 
     # theano conv3d2d: batch x time x channels x row  x column
     conv_result = theano.tensor.nnet.conv3d2d.conv3d(
         signals=inputs.dimshuffle(0,3,4,1,2), 
-        filters=filters_flipped.dimshuffle(0,3,4,1,2))
+        filters=filters.dimshuffle(0,3,4,1,2))
     conv_result = conv_result + bias.dimshuffle('x','x',0,'x','x')
     conv_result = conv_result.dimshuffle(0,3,4,1,2)
-    conv_function = theano.function([], conv_result)
+    conv_function = theano.function([inputs, filters, bias], conv_result)
     return conv_function
+
+def get_theano_input():
+    ftensor5 = T.TensorType('float32', (False,)*5)
+    inputs = ftensor5()
+    filters = ftensor5()
+    bias = T.fvector()
+    return inputs, filters, bias
 
 def loop_conv(X, W, b):
     # Go over all five dimensions 

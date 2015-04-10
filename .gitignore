@@ -2,3 +2,16 @@
 .cproject
 .project
 .settings/
+*.pyc
+*.pydevproject
+Theano/
+cudamat/
+cudnn-6.5-linux-x64-v2/
+my_nb_cert.pem
+pycuda-2014.1
+pylearn2-master
+scikits.cuda-master
+stanford-cs193g-sp2010
+virtual-environment
+.ipynb_checkpoints
+*.swp
