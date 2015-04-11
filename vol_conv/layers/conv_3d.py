@@ -120,9 +120,9 @@ class Conv3dElemwise(Layer):
             sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
 
         dummy_detector = dummy_detector.eval()
-        self.output_space = Conv3DSpace(shape=dummy_detector.shape[1:4],
-                                        num_channels=self.output_channels,
-                                        axes=self.detector_space.axes)
+        
+        # no pooling so set output space to detector space shape
+        self.output_space = self.detector_space
 
         logger.info('Output space: {0}'.format(self.output_space.shape))
 
