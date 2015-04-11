@@ -15,3 +15,4 @@ stanford-cs193g-sp2010
 virtual-environment
 .ipynb_checkpoints
 *.swp
+cudnn-python-wrappers
