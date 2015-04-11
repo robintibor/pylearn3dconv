@@ -8,7 +8,7 @@ from test_data import generate_test_data
 from convolutions import loop_conv_on_gpu, create_theano_conv3d, \
     vectorized_conv, loop_conv, create_theano_conv3d2d, compute_out_shape, \
     vectorized_cudamat_conv, vectorized_theano_conv, create_theano_blas_corr3d, \
-    create_theano_conv3d_fft
+    create_theano_conv3d_fft, cudnn_3dconv
 
 from timeit import default_timer as timer
 import numpy as np
@@ -24,6 +24,7 @@ from perf import perf_func
 def perf_3d_convs(inputs_shape, filters_shape):
     inputs, filters, bias = generate_test_data(np.random,inputs_shape,
         filters_shape)
+    bias = bias * 0
     output_shape = compute_out_shape(inputs_shape, filters_shape)
     print("Batches/Filters, rows, columns, times, channels")
     print("Input shape  {:s}".format(inputs_shape))
@@ -34,15 +35,32 @@ def perf_3d_convs(inputs_shape, filters_shape):
     print("#Outputs {:7d}".format(np.prod(output_shape)))
     print("#Multiplications {:7d}".format(
         np.prod(filters_shape) * np.prod(output_shape)))
-    theano_3d = create_theano_conv3d()
+
     # flipping from https://groups.google.com/forum/#!msg/theano-users/1S9_bZgHxVw/0cQR9a4riFUJ
     filters_flip = filters[:,::-1,::-1,::-1,:]  # flip width, height and time
-    theano_3d_2d = create_theano_conv3d2d()
-    theano_blas_3d = create_theano_blas_corr3d()
-    theano_3d_fft = create_theano_conv3d_fft()
-
+    """ checks for cudnn...unfortunately didnt work :(
+    inputs = inputs * 0 + 1
+    #inputs[0,0,0,0,0] = 6
+    #inputs[0,0,1,0,0] = 2
+    #inputs[0,0,0,1,0] = 2
+    inputs[0,0,0,0,1] = 5
+    filters = filters * 0 + 1
     #correct_result = theano_3d_func(inputs, filters, bias)
     #correct_result = vectorized_conv(inputs, filters, bias)
+    correct_result = vectorized_conv(inputs, filters, bias)
+    correct_result2 = cudnn_3dconv(inputs, filters, bias)
+    #print("inputs", inputs)
+    #print("filters", filters)
+    print("result", correct_result)
+    print("cudnn result", correct_result2)
+    diff = np.sum(np.square(correct_result - correct_result2))
+    print("Diff {:f} too big".format(diff))
+    import sys; sys.exit(0);
+    """
+    theano_blas_3d = create_theano_blas_corr3d()
+    theano_3d_fft = create_theano_conv3d_fft()
+    theano_3d = create_theano_conv3d()
+    theano_3d_2d = create_theano_conv3d2d()
     correct_result = theano_blas_3d(inputs, filters, bias)
     perf_func("Theano Blas 3d", theano_blas_3d, correct_result,
         inputs, filters, bias)

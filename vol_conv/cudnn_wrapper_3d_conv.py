@@ -17,8 +17,10 @@ filters_in = 10
 filters_out = 8
 height_in = 20
 width_in = 20
+frames_in = 5
 height_filter = 5
 width_filter = 5
+frames_filter = 4
 pad_h = 4
 pad_w = 4
 vertical_stride = 1
@@ -28,41 +30,49 @@ upscaley = 1
 alpha = 1.0
 beta = 1.0
 
+inputs_shape = [n_input, filters_in, height_in, width_in, frames_in]
+filters_shape = [filters_out, filters_in, height_filter, width_filter, 
+    frames_filter]
+nbDims = len(filters_shape)
+conv_dims = 3 #?
+padding_shape = [0] * conv_dims #
+filter_stride_shape = [1] * conv_dims
+upscale_shape = [1] * conv_dims
+tensor_stride = [1] * nbDims
 #test_desc = libcudnn.cudnnCreateTensorDescriptor()
 #libcudnn.cudnnSetTensorNdDescriptor(test_desc, data_type,
 #    n_input, filters_in, height_in, width_in)
 # Input tensor
-X = gpuarray.to_gpu(np.random.rand(n_input, filters_in, height_in, width_in)
-    .astype(np.float32))
+X = gpuarray.to_gpu(np.random.rand(*inputs_shape).astype(np.float32))
 
 # Filter tensor
-filters = gpuarray.to_gpu(np.random.rand(filters_out,
-    filters_in, height_filter, width_filter).astype(np.float32))
+filters = gpuarray.to_gpu(np.random.rand(*filters_shape).astype(np.float32))
 
 # Descriptor for input
 X_desc = libcudnn.cudnnCreateTensorDescriptor()
-libcudnn.cudnnSetTensor4dDescriptor(X_desc, tensor_format, data_type,
-    n_input, filters_in, height_in, width_in)
+libcudnn.cudnnSetTensorNdDescriptor(X_desc, data_type,
+    nbDims, inputs_shape, tensor_stride)
 # Filter descriptor
 filters_desc = libcudnn.cudnnCreateFilterDescriptor()
-libcudnn.cudnnSetFilter4dDescriptor(filters_desc, data_type, filters_out,
-    filters_in, height_filter, width_filter)
+libcudnn.cudnnSetFilterNdDescriptor(filters_desc, data_type, nbDims,
+    filters_shape)
 
 # Convolution descriptor
 conv_desc = libcudnn.cudnnCreateConvolutionDescriptor()
-libcudnn.cudnnSetConvolution2dDescriptor(conv_desc, pad_h, pad_w,
-    vertical_stride, horizontal_stride, upscalex, upscaley,
+libcudnn.cudnnSetConvolutionNdDescriptor(conv_desc, conv_dims,
+    padding_shape,
+    filter_stride_shape, upscale_shape,
     convolution_mode)
 
 # Get output dimensions (first two values are n_input and filters_out)
-_, _, height_output, width_output = libcudnn.cudnnGetConvolution2dForwardOutputDim(
-    conv_desc, X_desc, filters_desc)
-
+output_shape = libcudnn.cudnnGetConvolutionNdForwardOutputDim(
+    conv_desc, X_desc, filters_desc, nbDims)
+print output_shape
 # Output tensor
-Y = gpuarray.empty((n_input, filters_out, height_output, width_output), np.float32)
+Y = gpuarray.empty(output_shape, np.float32)
 Y_desc = libcudnn.cudnnCreateTensorDescriptor()
-libcudnn.cudnnSetTensor4dDescriptor(Y_desc, tensor_format, data_type, n_input,
-    filters_out, height_output, width_output)
+libcudnn.cudnnSetTensorNdDescriptor(Y_desc, data_type, nbDims,
+    output_shape, tensor_stride)
 
 # Get pointers to GPU memory
 X_data = ctypes.c_void_p(int(X.gpudata))
@@ -75,9 +85,9 @@ algo = libcudnn.cudnnGetConvolutionForwardAlgorithm(cudnn_context, X_desc,
 libcudnn.cudnnConvolutionForward(cudnn_context, alpha, X_desc, X_data,
     filters_desc, filters_data, conv_desc, algo, None, 0, beta,
     Y_desc, Y_data)
-print type(X)
-print type(Y)
+Y_arr = np.array(Y.get(), dtype='float32')
 
+#print np.array(Y)
 # Clean up
 libcudnn.cudnnDestroyTensorDescriptor(X_desc)
 libcudnn.cudnnDestroyTensorDescriptor(Y_desc)

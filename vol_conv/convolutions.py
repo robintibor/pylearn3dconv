@@ -7,10 +7,85 @@ import cudamat
 from theano.sandbox.cuda.basic_ops import gpu_contiguous
 conv_mod = SourceModule(open('conv.cu').read())
 loop_conv_on_gpu_func = conv_mod.get_function("loop_conv")
-from timeit import default_timer as timer
 import theano.tensor as T
 from theano.sandbox.cuda.blas import GpuCorr3dMM
 import theano.sandbox.cuda.fftconv
+import libcudnn
+from pycuda import gpuarray
+import ctypes
+
+def cudnn_3dconv(inputs, filters, bias):
+    """ Doesnt work maybe try setting workspace memory or sth for convolution
+    forward :("""
+    """ if it works try initializing Y with bias and setting beta to 1.0"""
+    cudnn_context = libcudnn.cudnnCreate()
+    inputs = inputs.transpose(0,4,1,2,3)
+    filters = filters.transpose(0,4,1,2,3)
+    data_type = libcudnn.cudnnDataType['CUDNN_DATA_FLOAT']
+    convolution_mode = libcudnn.cudnnConvolutionMode['CUDNN_CROSS_CORRELATION']
+    convolution_fwd_pref = libcudnn.cudnnConvolutionFwdPreference['CUDNN_CONVOLUTION_FWD_PREFER_FASTEST']
+
+    convolution_mode = libcudnn.cudnnConvolutionMode['CUDNN_CROSS_CORRELATION']
+    convolution_fwd_pref = libcudnn.cudnnConvolutionFwdPreference['CUDNN_CONVOLUTION_FWD_PREFER_FASTEST']
+
+    nbDims = len(filters.shape)
+    alpha = 1.0
+    beta = 0.0 # we ignore output before, i.e. we don't have a prior output
+    conv_dims = 3
+    padding_per_dim = [0] * conv_dims
+    filter_stride = [1] * conv_dims
+    upscale_per_dim = [1] * conv_dims
+    input_stride = [1] * nbDims
+    output_stride = [1] * nbDims
+    # Input tensor
+    inputs = gpuarray.to_gpu(np.ascontiguousarray(inputs, dtype=np.float32))
+    print ("sum in func", np.sum(inputs.get()))
+    # Filter tensor
+    filters = gpuarray.to_gpu(np.ascontiguousarray(filters, dtype=np.float32))
+    
+    # Descriptor for input
+    X_desc = libcudnn.cudnnCreateTensorDescriptor()
+    libcudnn.cudnnSetTensorNdDescriptor(X_desc, data_type,
+        nbDims, inputs.shape, input_stride)
+    # Filter descriptor
+    filters_desc = libcudnn.cudnnCreateFilterDescriptor()
+    libcudnn.cudnnSetFilterNdDescriptor(filters_desc, data_type, nbDims,
+        filters.shape)
+    
+    # Convolution descriptor
+    conv_desc = libcudnn.cudnnCreateConvolutionDescriptor()
+    libcudnn.cudnnSetConvolutionNdDescriptor(conv_desc, conv_dims,
+        padding_per_dim, filter_stride, upscale_per_dim, convolution_mode)
+    
+    # Get output dimensions (first two values are n_input and filters_out)
+    output_shape = libcudnn.cudnnGetConvolutionNdForwardOutputDim(
+        conv_desc, X_desc, filters_desc, nbDims)
+    # Output tensor
+    Y = gpuarray.to_gpu(np.ascontiguousarray(np.zeros(output_shape), 
+        dtype=np.float32))
+    Y_desc = libcudnn.cudnnCreateTensorDescriptor()
+    libcudnn.cudnnSetTensorNdDescriptor(Y_desc, data_type, nbDims,
+        output_shape, output_stride)
+    # Get pointers to GPU memory
+    X_data = ctypes.c_void_p(int(inputs.gpudata))
+    filters_data = ctypes.c_void_p(int(filters.gpudata))
+    Y_data = ctypes.c_void_p(int(Y.gpudata))
+    
+    # Perform convolution
+    algo = libcudnn.cudnnGetConvolutionForwardAlgorithm(cudnn_context, X_desc,
+        filters_desc, conv_desc, Y_desc, convolution_fwd_pref, 0)
+    libcudnn.cudnnConvolutionForward(cudnn_context, alpha, X_desc, X_data,
+        filters_desc, filters_data, conv_desc, algo, None, 0, beta,
+        Y_desc, Y_data)
+    Y_arr = np.array(Y.get(), dtype='float32').transpose(0,2,3,4,1)
+    print ("sum end func", np.sum(inputs.get()))
+    # Clean up
+    libcudnn.cudnnDestroyTensorDescriptor(X_desc)
+    libcudnn.cudnnDestroyTensorDescriptor(Y_desc)
+    libcudnn.cudnnDestroyFilterDescriptor(filters_desc)
+    libcudnn.cudnnDestroyConvolutionDescriptor(conv_desc)
+    libcudnn.cudnnDestroy(cudnn_context)
+    return Y_arr
 
 def compute_out_shape(inputs_shape, filters_shape):
     num_batches = inputs_shape[0]

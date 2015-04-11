@@ -23,10 +23,24 @@ from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
 from vol_conv.test_data import generate_test_data
 
+""" Set globally to only compute them once"""
+inputs = None
+
 def setup_training(inputs_shape, filters_shape, kernel_stride, conv_layer_class):
+    """ Setup model, prediction function, algorithm for training"""
+    global inputs
+    # a great seed is half the work :)
     rng = RandomState(hash('tobipuma') % 4294967295)
-    inputs, _, _ = generate_test_data(rng, inputs_shape, 
-        filters_shape)
+    if inputs is None:
+        # Only generate once so you can switch order of experiments without
+        # changing inputs
+        # Normally this should not be necessary as we set the seed of the random
+        # state. But still it leads to different results for some reason
+        # I don't understand.
+        # maybe related to this: 
+        # http://stackoverflow.com/questions/27732543/why-does-creation-of-a-theano-shared-variable-on-gpu-effect-numpys-random-strea
+        inputs, _, _ = generate_test_data(rng, inputs_shape, 
+            filters_shape)
     train_set, valid_set, test_set = generate_datasets(inputs)
     mlp = construct_model(inputs_shape, filters_shape, kernel_stride, 
         conv_layer_class)
@@ -53,7 +67,7 @@ def construct_model(inputs_shape, filters_shape, kernel_stride,
     conv_3d_input_space = Conv3DSpace(inputs_shape[1:4], 
         num_channels=inputs_shape[4], axes=('b',0,1,2,'c'))
     conv_3d_layer = conv_layer_class(output_channels=filters_shape[0], 
-        kernel_shape=filters_shape[1:4],
+        kernel_shape=filters_shape[1:4], kernel_stride = kernel_stride,
         layer_name='conv3d_lin', nonlinearity=IdentityConvNonlinearity(),
         irange=0.001)
     softmax_layer = Softmax(max_col_norm=2, layer_name='y',
@@ -89,7 +103,7 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
             results[name].append(accuracy)
         algorithm.train(train_set)
    
-    """ for debug, enable this...
+    """for debug, enable this...
     for setname in results:
         print("Training mismatch,\n" + \
             "Expect {:s} for class {:s} to be:\n{:s},\nGot:\n{:s}").format(
@@ -117,6 +131,7 @@ def expect_results(inputs_shape, filters_shape, kernel_stride, conv_layer_class,
 def test_training():
     inputs_shape = [100,7,6,5,3]
     filters_shape = [11,4,3,2,3]
+    # First with no stride
     kernel_stride = [1, 1, 1]
     expect_results(inputs_shape, filters_shape, kernel_stride,
         Theano3dConv3dElemwise,
@@ -126,17 +141,36 @@ def test_training():
        })
     expect_results(inputs_shape, filters_shape, kernel_stride,
         Theano3d2dConv3dElemwise,
-        {'train': [0.36, 0.98, 1.0, 1.0, 1.0],
-         'valid': [0.36, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.36, 0.84, 0.88, 0.92, 0.92],
+        {'train': [0.32, 0.98, 1.0, 1.0, 1.0],
+         'valid': [0.28, 0.92, 0.92, 0.96, 0.96],
+         'test': [0.28, 0.84, 0.84, 0.84, 0.88],
        })
     expect_results(inputs_shape, filters_shape, kernel_stride,
         CuBlasConv3dElemwise,
-        {'train': [0.5, 0.98, 1.0, 1.0, 1.0],
-         'valid': [0.4, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.24, 0.84, 0.88, 0.92, 0.92],
+        {'train': [0.4, 0.96, 1.0, 1.0, 1.0],
+         'valid': [0.36, 0.88, 0.92, 0.92, 0.96],
+         'test': [0.2, 0.84, 0.84, 0.84, 0.84],
        })
-
+    # Then with stride
+    kernel_stride = [2, 1, 2]
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3dConv3dElemwise,
+        {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
+         'test': [0.56, 0.88, 0.96, 1.0, 1.0],
+       })
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3d2dConv3dElemwise,
+        {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
+         'test': [0.56, 0.84, 0.92, 1.0, 1.0],
+       })
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuBlasConv3dElemwise,
+        {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
+         'test': [0.84, 0.84, 0.92, 0.96, 0.96],
+       })
 
 if __name__ == '__main__':
     test_training()

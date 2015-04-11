@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 default_seed = hash('tobipuma') % 4294967295 # good seed is important ;)
 
 def make_conv_3d(irange, input_space, output_space,
-        kernel_shape, conv_op, init_bias=0., rng=None):
+        kernel_shape, kernel_stride, conv_op, init_bias=0., rng=None):
     rng = make_np_rng(rng, default_seed, which_method='uniform')
     weights_shape = _get_weights_shape(out_channels = output_space.num_channels,
         kernel_shape=kernel_shape, in_channels=input_space.num_channels, 
@@ -23,6 +23,7 @@ def make_conv_3d(irange, input_space, output_space,
     return conv_op(
         filters=W,
         bias=bias,
+        kernel_stride = kernel_stride,
         input_space=input_space,
         output_axes=output_space.axes,
     )
@@ -77,6 +78,7 @@ class Conv3dElemwise(Layer):
     def __init__(self,
                  output_channels,
                  kernel_shape,
+                 kernel_stride,
                  layer_name,                 
                  nonlinearity,
                  irange,
@@ -103,6 +105,7 @@ class Conv3dElemwise(Layer):
             input_space=self.input_space,
             output_space=self.detector_space,
             kernel_shape=self.kernel_shape,
+            kernel_stride=self.kernel_stride,
             conv_op=self.conv_theano_op,
             rng=rng)
 
@@ -139,13 +142,11 @@ class Conv3dElemwise(Layer):
 
         rng = self.mlp.rng
 
-        output_shape = [int(self.input_space.shape[0]
-                             - self.kernel_shape[0]) + 1,
-                        int(self.input_space.shape[1]
-                             - self.kernel_shape[1]) + 1,
-                        int(self.input_space.shape[2]
-                             - self.kernel_shape[2]) + 1]
-        
+        # output shape determined by input/kernel shapes and stride
+        output_shape = [int((self.input_space.shape[i] - 
+                            self.kernel_shape[i]) / 
+                        self.kernel_stride[i]) + 1 
+                        for i in xrange(3)]
 
         self.detector_space = Conv3DSpace(shape=output_shape,
                                           num_channels=self.output_channels,

@@ -5,8 +5,9 @@ from pylearn2.linear.linear_transform import LinearTransform as P2LT
 
 class Theano3dConv():
     op_axes = ('b', 0, 1, 2, 'c')
-    def __init__(self, filters, bias, input_space, output_axes):
+    def __init__(self, filters, bias, kernel_stride, input_space, output_axes):
         self.__dict__.update(locals())
+        del self.self
 
     def lmul(self, x):
         assert x.ndim == 5
@@ -17,7 +18,7 @@ class Theano3dConv():
             reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
             x = x.dimshuffle(*reshuffle_arr)
 
-        rval = Conv3D()(x, self.filters, self.bias, d=(1,1,1))
+        rval = Conv3D()(x, self.filters, self.bias, d=tuple(self.kernel_stride))
 
         output_axes = self.output_axes
         assert len(output_axes) == 5
