@@ -5,8 +5,16 @@ from pycuda.compiler import SourceModule
 import theano.tensor.nnet.conv3d2d
 import cudamat
 from theano.sandbox.cuda.basic_ops import gpu_contiguous
-conv_mod = SourceModule(open('conv.cu').read())
-loop_conv_on_gpu_func = conv_mod.get_function("loop_conv")
+import os
+
+try:
+    conv_mod = SourceModule(open(os.path.join(
+        os.path.dirname(__file__), 'conv.cu')).read())
+    loop_conv_on_gpu_func = conv_mod.get_function("loop_conv")
+except cuda.LogicError, e:
+    print(("Could not load cuda function, "
+        "loop_conv_on_gpu will not work:\n{:s} ").format(
+        e))
 import theano.tensor as T
 from theano.sandbox.cuda.blas import GpuCorr3dMM
 import theano.sandbox.cuda.fftconv

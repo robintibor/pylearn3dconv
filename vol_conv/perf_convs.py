@@ -20,7 +20,6 @@ cudamat.cuda_set_device(int(re.search("gpu([0-4])", theano.config.device).group(
 cudamat.init()
 from perf import perf_func
 
-
 def perf_3d_convs(inputs_shape, filters_shape):
     inputs, filters, bias = generate_test_data(np.random,inputs_shape,
         filters_shape)

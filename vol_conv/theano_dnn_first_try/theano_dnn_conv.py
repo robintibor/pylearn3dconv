@@ -191,30 +191,19 @@ class GpuDnn3dConv(DnnBase, COp):
     :param kernel:
     :param descr: the convolution descriptor
     """
-    __props__ = ('workmem',)
+    __props__ = ()
 
-    def __init__(self, workmem=None):
-        """
-        :param workmem: either 'none', 'small' or 'large'.  Default is
-        the value of :attr:`config.dnn.conv.workmem`.
-        """
+    def __init__(self):
         # TODO: reenable inplace http://deeplearning.net/software/theano/extending/inplace.html
         theano_cuda_dir = os.path.dirname(theano.sandbox.cuda.__file__)
         theano_files = ["dnn_base.c",
             os.path.join(theano_cuda_dir,"dnn_conv_base.c"),
             "dnn_fwd.c"]
-        #theano_files = [os.path.join(theano_cuda_dir, f) for f in theano_files]
         COp.__init__(self, theano_files,
                      "APPLY_SPECIFIC(conv_fwd)")
-        if workmem is None:
-            workmem = config.dnn.conv.workmem
-        self.workmem = workmem
-        assert self.workmem in ['none', 'small', 'large']
 
     def __setstate__(self, d):
         self.__dict__.update(d)
-        if not hasattr(self, 'workmem'):
-            self.workmem = 'none'
 
     def get_op_params(self):
         if version() == -1:
