@@ -27,6 +27,7 @@ int main(int argc, char* argv[])
     printf("Usage:\n./crash_main [device_number]\n");
     return 1;
   }
+  set_device(argv);
   foo<<<1,1>>>(0);
   check_cuda_errors(__FILE__, __LINE__);
 

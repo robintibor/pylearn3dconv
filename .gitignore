@@ -16,3 +16,6 @@ virtual-environment
 .ipynb_checkpoints
 *.swp
 cudnn-python-wrappers
+cudnn_sample.cpp
+volumetric_in_c
+*.o
