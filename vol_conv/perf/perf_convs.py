@@ -80,8 +80,6 @@ def perf_3d_convs(inputs_shape, filters_shape):
     perf_func("Python Loop", loop_conv, correct_result, 
         inputs, filters, bias)
     
-
-    
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
         description="""Performance experiments for 3d convolutions.

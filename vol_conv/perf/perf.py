@@ -17,4 +17,7 @@ def perf_func(name, func, correct_result, *func_args):
         name, runs, 1000 * total_running_time / runs))
     if (correct_result is not None):
         diff = np.sum(np.square(correct_result - result))
-        assert diff < 1e-2, "Diff {:f} too big for {:s}".format(diff, name)
+        tolerance = 1e-2
+        assert diff < tolerance, "Diff {:f} too big for {:s}".format(diff, name)
+        if diff < tolerance:
+            print("Result check ok with diff {:4.3f}".format(diff))
