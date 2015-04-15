@@ -5,13 +5,13 @@ from pylearn2.linear.linear_transform import LinearTransform as P2LT
 
 class Theano3dConv():
     op_axes = ('b', 0, 1, 2, 'c')
-    def __init__(self, filters, bias, kernel_stride, input_space, output_axes):
+    def __init__(self, filters, bias, kernel_stride, input_axes, output_axes):
         self.__dict__.update(locals())
         del self.self
 
     def lmul(self, x):
         assert x.ndim == 5
-        input_axes = self.input_space.axes
+        input_axes = self.input_axes
         assert len(input_axes) == 5
         if tuple(input_axes) != self.op_axes:
             # convert from input axes to op_axes

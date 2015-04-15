@@ -46,15 +46,13 @@ c_set_tensor5d(CudaNdarray *var, cudnnTensorDescriptor_t desc) {
 		 CudaNdarray_HOST_DIMS(var)[2],
 		 CudaNdarray_HOST_DIMS(var)[3],
                  CudaNdarray_HOST_DIMS(var)[4],
-		 CudaNdarray_HOST_STRIDES(var)[0]?CudaNdarray_HOST_STRIDES(var)[0]:CudaNdarray_HOST_DIMS(var)[4]*CudaNdarray_HOST_DIMS(var)[3]*CudaNdarray_HOST_DIMS(var)[2]*CudaNdarray_HOST_DIMS(var)[1],
-		 CudaNdarray_HOST_STRIDES(var)[1]?CudaNdarray_HOST_STRIDES(var)[1]:CudaNdarray_HOST_DIMS(var)[4]*CudaNdarray_HOST_DIMS(var)[3]*CudaNdarray_HOST_DIMS(var)[2],
-		 CudaNdarray_HOST_STRIDES(var)[2]?CudaNdarray_HOST_STRIDES(var)[2]:CudaNdarray_HOST_DIMS(var)[4]*CudaNdarray_HOST_DIMS(var)[3],
-		 CudaNdarray_HOST_STRIDES(var)[3]?CudaNdarray_HOST_STRIDES(var)[3]:CudaNdarray_HOST_DIMS(var)[4],
-	         CudaNdarray_HOST_STRIDES(var)[4]?CudaNdarray_HOST_STRIDES(var)[4]:1
-
+                 hostStrides[0],
+                 hostStrides[1],
+                 hostStrides[2],
+                 hostStrides[3],
+                 hostStrides[4]
     );
   }
-  printf("returning zero from set tensor\n");
   return 0;
 }
 
@@ -95,7 +93,6 @@ c_set_filter5d(CudaNdarray *var, cudnnFilterDescriptor_t desc) {
                  CudaNdarray_HOST_DIMS(var)[4]);
     return -1;
   }
-  printf("returning zero from set filter\n");
   return 0;
 }
 

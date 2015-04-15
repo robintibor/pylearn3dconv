@@ -24,8 +24,8 @@ def make_conv_3d(irange, input_space, output_space,
         filters=W,
         bias=bias,
         kernel_stride = kernel_stride,
-        input_space=input_space,
-        output_axes=output_space.axes,
+        input_axes=input_space.axes,
+        output_axes=output_space.axes
     )
 
 def _get_weights_shape(out_channels, kernel_shape, in_channels, conv_op_axes):
@@ -119,10 +119,10 @@ class Conv3dElemwise(Layer):
 
         if dummy_batch_size is None:
             dummy_batch_size = 2
-        dummy_detector =\
-            sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
+        #dummy_detector =\
+        #    sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
 
-        dummy_detector = dummy_detector.eval()
+        #dummy_detector = dummy_detector.eval()
         
         # no pooling so set output space to detector space shape
         self.output_space = self.detector_space

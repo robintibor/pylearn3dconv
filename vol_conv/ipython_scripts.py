@@ -62,9 +62,9 @@ desc_op = desc.owner.op
 out_shp = owndnn.GpuDnn3dConv.get_out_shape(inputs.shape, filters.shape,
                                    desc_op.subsample)
 
-
 out = gpu_alloc_empty(*out_shp)
-
+#680710144#680710144#680710144
+# no reference: 762105856#762105856
 conv_result = owndnn.GpuDnn3dConv()(inputs, filters, out, desc)
 
 conv_result_func = theano.function([inputs, filters], conv_result, mode='DebugMode')
