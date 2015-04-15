@@ -28,64 +28,6 @@ from theano.sandbox.cuda.nvcc_compiler import NVCC_compiler
 from theano.sandbox.cuda.dnn import dnn_available, version, DnnBase, \
     DnnVersion, ensure_float, _one, _zero
 
-
-def c_set_tensor5d(var, desc, err, fail):
-    # TODO when is this even called? remove it maybe? check when other 
-    # one is called
-    return """
-{
-    int nbDims = %(var)s->nd; 
-    if (nbDims != 5) {
-      PyErr_Format(PyExc_RuntimeError,
-                   "Number of dimensions should be 5 for 3d convolution, "
-                   "instead got %d",
-                   nbDims);
-      return -1;
-    }
-    int hostStrides[nbDims];
-    // multiply strides in remaining dims in case
-    // there is one stride of dimension 0
-    int strides_multiplied = 1;
-    for (int i = nbDims - 1; i >= 0; i--) {
-      hostStrides[i] = CudaNdarray_HOST_STRIDES(var)[i];
-      if (hostStrides[i] == 0) {
-        hostStrides[i] = strides_multiplied;
-      }
-      strides_multiplied *= hostStrides[i];
-    }
-    // TODO: copy necessary?
-    int hostDims[nbDims];
-    for (int i = 0; i < nbDims; i++) {
-      hostDims[i] = CudaNdarray_HOST_DIMS(var)[i];
-    }
-%(err)s = cudnnSetTensorNdDescriptor(
-    %(desc)s, CUDNN_DATA_FLOAT,
-    nbDims,
-    hostDims,
-    hostStrides
-);
-  if (err != CUDNN_STATUS_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError,
-         "Could not set tensor5d descriptor: %s"
-         "shapes=%d %d %d %d %d, strides=%d %d %d %d %d",
-         cudnnGetErrorString(err),
-         hostDims[0],
-         hostDims[1],
-         hostDims[2],
-         hostDims[3],
-         hostDims[4],
-        hostStrides[0],
-        hostStrides[1],
-        hostStrides[2],
-        hostStrides[3],
-        hostStrides[4],
-    );
-  }
-}
-
-        """ % dict(var=var, err=err, desc=desc, fail=fail)
-
-
 class GpuDnnConv3dDesc(GpuOp):
     """This Op builds a 3d convolution descriptor for use in the other
     convolution operations.
@@ -136,8 +78,8 @@ class GpuDnnConv3dDesc(GpuOp):
 {
   cudnnStatus_t err;
   int convDims = 3;
-  int padA[3] = {0,0,0};
-  int filterStride[3] = {1,1,1}; // TODO: take real stride
+  int padA[3] = {0,0,0}; // TODELAY: no padding for now, could reenable that
+  int filterStride[3] = {%(filter_stride)s}; // TODO: take real stride
   int upscaleA[3]  = { 1,1,1 }; // don't upscale
 
   if ((err = cudnnCreateConvolutionDescriptor(&%(desc)s)) != CUDNN_STATUS_SUCCESS) {
@@ -169,7 +111,8 @@ class GpuDnnConv3dDesc(GpuOp):
 }
 """ % dict(num_dims=num_dims, desc=desc,
         conv_flag=conv_flag, fail=sub['fail'],
-        filter_stride = self.subsample,)
+        # transform subsample tuple to x,y,z string like 1,1,1
+        filter_stride = str(tuple(self.subsample)).strip('()'))
 
     def do_constant_folding(self, node):
         

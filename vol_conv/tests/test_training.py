@@ -111,8 +111,6 @@ def expect_results(inputs_shape, filters_shape, kernel_stride, conv_layer_class,
         expected_results)
     print conv_layer_class.__name__ + " - Ok."
 
-
-
 def setup_training(inputs, filters, bias, kernel_stride, conv_layer_class):
     """ Setup model, prediction function, algorithm for training"""
     train_set, valid_set, test_set = generate_datasets(inputs)
@@ -185,14 +183,14 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
             results[name].append(accuracy)
         algorithm.train(train_set)
    
-    #"""for debug, enable this...
+    """for debug, enable this...
     for setname in results:
         print("Training mismatch,\n" + \
             "Expect {:s} for class {:s} to be:\n{:s},\nGot:\n{:s}").format(
                 setname,
                 algorithm.model.layers[0].__class__.__name__,
                 expected_results[setname], 
-                np.round(results[setname], decimals=2).tolist())#"""
+                np.round(results[setname], decimals=2).tolist())"""
     for setname in results:
         assert np.allclose(results[setname], expected_results[setname]), \
             ("Training mismatch,\n" + \
