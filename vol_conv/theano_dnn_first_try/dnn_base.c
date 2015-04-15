@@ -12,15 +12,15 @@ c_set_tensor5d(CudaNdarray *var, cudnnTensorDescriptor_t desc) {
       return -1;
     }
     int hostStrides[nbDims];
-    // multiply strides in remaining dims in case
+    // multiply dims of remaining dims in case
     // there is one stride of dimension 0
-    int strides_multiplied = 1;
+    int dims_multiplied = 1;
     for (int i = nbDims - 1; i >= 0; i--) {
       hostStrides[i] = CudaNdarray_HOST_STRIDES(var)[i];
       if (hostStrides[i] == 0) {
-        hostStrides[i] = strides_multiplied;
+        hostStrides[i] = dims_multiplied;
       }
-      strides_multiplied *= hostStrides[i];
+      dims_multiplied *= CudaNdarray_HOST_DIMS(var)[i];
     }
     // TODO: copy necessary?
     int hostDims[nbDims];

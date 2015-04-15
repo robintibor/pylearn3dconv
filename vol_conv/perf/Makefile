@@ -5,7 +5,7 @@ CC=g++
 CFLAGS=-I. -I$(CUDA_PATH)/include -I$(CUDNN_PATH) -O3
 LIBS=-lcudart -lcudnn -lstdc++
 LFLAGS=-L$(CUDA_PATH)/lib64 -L$(CUDNN_PATH) $(LIBS)
-MAIN_BINARIES = volumetric_main volumetric_grad_main
+MAIN_BINARIES = volumetric_main volumetric_grad_main grad_bug_main
 OBJ = 
 
 compile: $(MAIN_BINARIES)

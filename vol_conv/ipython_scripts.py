@@ -34,50 +34,65 @@ import theano
 import theano.tensor as T
 from vol_conv.volumetric_dense_design_matrix import VolumetricDenseDesignMatrix
 from pylearn2.training_algorithms.sgd import SGD
-from pylearn2.models.mlp import MLP, Softmax
+from pylearn2.models.mlp import MLP, Softmax, ConvElemwise
 from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
-
-
+from pylearn2.space import Conv2DSpace
+from vol_conv.layers.blas2d_manuel_conv import ConvElemwiseBlas
+from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
+from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
+from vol_conv.perf.perf_layers import create_fprop_layer_3d_symbolic
+from vol_conv.test_data import generate_test_data
+import theano.sandbox.cuda
 import theano
 import theano.sandbox.cuda.dnn as cdnn
 from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            host_from_gpu,
                                            gpu_contiguous, HostFromGpu,
                                            gpu_alloc_empty)
+from theano.sandbox.cuda.dnn import GpuDnnConv, GpuDnnConvDesc
+from numpy.random import RandomState
+from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
 
 import numpy as np
 import theano_dnn_first_try.theano_dnn_conv as owndnn
-
 ftensor5 = T.TensorType('float32', (False,)*5)
+class FakeMLP():
+    def __init__(self,rng,batch_size):
+        self.rng = rng
+        self.batch_size = batch_size
+        
+        
+# get small input
+rng = RandomState(np.uint32(hash('tobiderpuma')))
+inputs_shape = [5,8,4,7,3]
+inputs_shape = [5,2,4,7,3]
+filters_shape = [6,2,3,5,3]
 
-rng = RandomState(hash('manuelloewe') % 4294967296)
-inputs = ftensor5()
-filters = ftensor5()
-inputs = gpu_contiguous(inputs)
-filters = gpu_contiguous(filters)
-desc = owndnn.GpuDnnConv3dDesc(subsample=(1,1,1), conv_mode='cross')()
 
-desc_op = desc.owner.op
-out_shp = owndnn.GpuDnn3dConv.get_out_shape(inputs.shape, filters.shape,
-                                   desc_op.subsample)
+inputs, filters, bias = generate_test_data(rng, inputs_shape, filters_shape)
+#bias *= 0
+# compute gradient for Cublas
+# do it twice, compare result
+x = T.dscalar('x')
+inputs_theano = ftensor5()
 
-out = gpu_alloc_empty(*out_shp)
-#680710144#680710144#680710144
-# no reference: 762105856#762105856
-conv_result = owndnn.GpuDnn3dConv()(inputs, filters, out, desc)
+conv_result = create_fprop_layer_3d_symbolic(inputs_shape, filters, bias, CuBlasConv3dElemwise, inputs_theano)
+cost = T.sum(conv_result)
+conv_gradient = T.grad(cost, inputs_theano)
+grad_func = theano.function([inputs_theano], conv_gradient)
 
-conv_result_func = theano.function([inputs, filters], conv_result, mode='DebugMode')
-real_inputs = rng.normal(size=(5,3,4,3,1)).astype(np.float32)
-real_filters = rng.normal(size=(2,3,3,2,1)).astype(np.float32)
+correct_result = grad_func(inputs)
 
-real_inputs = rng.normal(size=(3,3,3,3,3)).astype(np.float32)
-real_filters = rng.normal(size=(3,3,3,3,3)).astype(np.float32)
-#real_inputs = np.ones((1,2,2,2,2)).astype(np.float32)
-#real_filters = np.ones((1,2,2,2,2)).astype(np.float32)
-#real_inputs[0,0,0,1,0] = 2
-bias = np.zeros(real_filters.shape[0])
-correct_result = vectorized_conv(real_inputs, real_filters, bias)
-result=conv_result_func(real_inputs, real_filters)
-print np.array(result)
-print correct_result
+inputs_theano_cudnn = ftensor5()
+inputs_theano_cudnn_contiguous = gpu_contiguous(inputs_theano_cudnn)
+conv_result_cudnn = create_fprop_layer_3d_symbolic(inputs_shape, filters, bias, CuDnnConv3dElemwise, 
+                                                   inputs_theano_cudnn_contiguous)
+cost_cudnn = T.sum(conv_result_cudnn)
+cost_cudnn = gpu_contiguous(cost_cudnn)
+conv_dnn_gradient = T.grad(cost_cudnn, inputs_theano_cudnn)
+grad_func_cudnn = theano.function([inputs_theano_cudnn], conv_dnn_gradient)
+
+cudnn_result = grad_func_cudnn(inputs)
+assert np.sum(np.square(cudnn_result- correct_result)) < 1e-4
+print "assertion passed results same"
