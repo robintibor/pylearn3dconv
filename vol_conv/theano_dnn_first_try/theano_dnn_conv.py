@@ -145,7 +145,6 @@ class GpuDnnConv3dDesc(GpuOp):
                  "descriptor: %%s", cudnnGetErrorString(err));
     %(fail)s
   }
-  // TODO: bordermode=padding
   // TODO: just remove if else, check cudnn version somewhere else
 #if defined(CUDNN_VERSION) && CUDNN_VERSION >= 20
   err = cudnnSetConvolutionNdDescriptor(
@@ -173,6 +172,8 @@ class GpuDnnConv3dDesc(GpuOp):
         filter_stride = self.subsample,)
 
     def do_constant_folding(self, node):
+        
+        # Todo check if this is from original, if not remove it again
         # Needed as we do not want to cache this information.
         return False
     
@@ -193,25 +194,34 @@ class GpuDnn3dConv(DnnBase, COp):
     """
     __props__ = ()
 
-    def __init__(self):
-        # TODO: reenable inplace http://deeplearning.net/software/theano/extending/inplace.html
+    def __init__(self,  inplace=False):
+        # TODO: reenable inplace optimizations http://deeplearning.net/software/theano/extending/inplace.html
         theano_cuda_dir = os.path.dirname(theano.sandbox.cuda.__file__)
         theano_files = ["dnn_base.c",
             os.path.join(theano_cuda_dir,"dnn_conv_base.c"),
             "dnn_fwd.c"]
         COp.__init__(self, theano_files,
                      "APPLY_SPECIFIC(conv_fwd)")
+        self.inplace = inplace
+        if self.inplace:
+            self.destroy_map = {0: [2]}
 
     def __setstate__(self, d):
         self.__dict__.update(d)
+        if not hasattr(self, 'inplace'):
+            self.inplace = False
 
     def get_op_params(self):
+        if self.inplace:
+            inpl_def = [('CONV_INPLACE', '1')]
+        else:
+            inpl_def = []
         if version() == -1:
             alg_def = ('CONV_ALGO', "0")
         else:
-            # it seems only this works?
+            # it seems only this works for nd convolutions?
             alg_def = ('CONV_ALGO', 'CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM')
-        return [alg_def]
+        return [alg_def] + inpl_def
 
     def make_node(self, img, kern, output, desc, alpha=None, beta=None):
         img = as_cuda_ndarray_variable(img)
@@ -234,15 +244,14 @@ class GpuDnn3dConv(DnnBase, COp):
         return Apply(self, [img, kern, output, desc, alpha, beta],
                      [output.type()])
 
-    """#TODO: grad
     def grad(self, inp, grads):
         img, kerns, output, desc, alpha, beta = inp
         top, = grads
 
         top = gpu_contiguous(top)
 
-        d_img = GpuDnnConvGradI()(kerns, top, gpu_alloc_empty(*img.shape), desc)
-        d_kerns = GpuDnnConvGradW()(img, top, gpu_alloc_empty(*kerns.shape), desc)
+        d_img = GpuDnn3dConvGradI()(kerns, top, gpu_alloc_empty(*img.shape), desc)
+        d_kerns = GpuDnn3dConvGradW()(img, top, gpu_alloc_empty(*kerns.shape), desc)
         d_alpha = grad_not_implemented(self, 4, alpha)
         d_beta = grad_not_implemented(self, 5, beta)
 
@@ -252,7 +261,7 @@ class GpuDnn3dConv(DnnBase, COp):
     def connection_pattern(self, node):
         # not connected to desc
         return [[1], [1], [1], [0], [1], [1]]
-    """
+    
     
     @staticmethod
     def get_out_shape(ishape, kshape, subsample):
@@ -294,3 +303,170 @@ class GpuDnn3dConv(DnnBase, COp):
         return int(time() * 100)# always recompile
         #return (2, version())
 
+class GpuDnn3dConvGradW(DnnBase, COp):
+    """
+    The convolution gradient with respect to the weights.
+
+    :param image:
+    :param kernel:
+    :param descr: the convolution descriptor
+
+    """
+    __props__ = ('inplace',)
+
+    def __init__(self, inplace=False):
+        theano_cuda_dir = os.path.dirname(theano.sandbox.cuda.__file__)
+        COp.__init__(self, ["dnn_base.c", 
+                        os.path.join(theano_cuda_dir,"dnn_conv_base.c"),
+                        "dnn_gw.c"],
+                     "APPLY_SPECIFIC(conv_gw)")
+        self.inplace = inplace
+        if self.inplace:
+            self.destroy_map = {0: [2]}
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+        if not hasattr(self, 'inplace'):
+            self.inplace = False
+
+    def grad(self, inp, grads):
+        img, top, output, desc, alpha, beta = inp
+        kerns, = grads
+
+        kerns = gpu_contiguous(kerns)
+
+        d_img = GpuDnn3dConvGradI()(kerns, top, gpu_alloc_empty(*img.shape), desc)
+        d_top = GpuDnn3dConv()(img, kerns, gpu_alloc_empty(*top.shape), desc)
+        d_alpha = grad_not_implemented(self, 4, alpha)
+        d_beta = grad_not_implemented(self, 5, beta)
+
+        return (d_img * alpha, d_top * alpha, kerns * beta,
+                DisconnectedType()(), d_alpha, d_beta)
+
+    def connection_pattern(self, node):
+        # not connected to desc
+        return [[1], [1], [1], [0], [1], [1]]
+
+    def get_op_params(self):
+        if self.inplace:
+            return [('CONV_INPLACE', '1')]
+        else:
+            return []
+
+    def make_node(self, img, topgrad, output, desc, alpha=None, beta=None):
+        img = as_cuda_ndarray_variable(img)
+        topgrad = as_cuda_ndarray_variable(topgrad)
+        output = as_cuda_ndarray_variable(output)
+        if img.type.ndim != 5:
+            raise TypeError('img must be 5D tensor')
+        if topgrad.type.ndim != 5:
+            raise TypeError('topgrad must be 5D tensor')
+        if output.type.ndim != 5:
+            raise TypeError('output must be 5D tensor')
+
+        if not isinstance(desc.type, CDataType) \
+                or desc.type.ctype != 'cudnnConvolutionDescriptor_t':
+            raise TypeError('desc must be cudnnConvolutionDescriptor_t')
+
+        alpha = ensure_float(alpha, _one, 'alpha')
+        beta = ensure_float(beta, _zero, 'beta')
+
+        return Apply(self, [img, topgrad, output, desc, alpha, beta],
+                     [output.type()])
+
+    def infer_shape(self, node, shape):
+        return [shape[2]]
+
+
+    # TODO: reenable constant folding
+    def do_constant_folding(self, node):
+        # Needed as we do not want to cache this information.
+        return False
+    
+    # TODO: reenable caching
+    def c_code_cache_version(self):
+        # TODO: set true again
+        from time import time
+        return int(time() * 100)# always recompile
+        #return (2, version())
+
+
+class GpuDnn3dConvGradI(DnnBase, COp):
+    """
+    The convolution gradient with respect to the inputs.
+
+    :param image:
+    :param kernel:
+    :param descr: the convolution descriptor
+
+    """
+    __props__ = ('inplace',)
+
+    def __init__(self, inplace=False):
+        theano_cuda_dir = os.path.dirname(theano.sandbox.cuda.__file__)
+        COp.__init__(self, ["dnn_base.c", 
+                        os.path.join(theano_cuda_dir,"dnn_conv_base.c"),
+                        "dnn_gi.c"],
+                     "APPLY_SPECIFIC(conv_gi)")
+        self.inplace = inplace
+        if self.inplace:
+            self.destroy_map = {0: [2]}
+
+    def grad(self, inp, grads):
+        kerns, top, output, desc, alpha, beta = inp
+        img, = grads
+
+        img = gpu_contiguous(img)
+
+        d_kerns = GpuDnn3dConvGradW()(img, top, gpu_alloc_empty(*kerns.shape), desc)
+        d_top = GpuDnn3dConv()(img, kerns, gpu_alloc_empty(*top.shape), desc)
+        d_alpha = grad_not_implemented(self, 4, alpha)
+        d_beta = grad_not_implemented(self, 5, beta)
+        return (d_kerns * alpha, d_top * alpha, img * beta,
+                DisconnectedType()(), d_alpha, d_beta)
+
+    def connection_pattern(self, node):
+        # not connected to desc
+        return [[1], [1], [1], [0], [1], [1]]
+
+    def get_op_params(self):
+        if self.inplace:
+            return [('CONV_INPLACE', '1')]
+        else:
+            return []
+
+    def make_node(self, kern, topgrad, output, desc, alpha=None, beta=None):
+        kern = as_cuda_ndarray_variable(kern)
+        topgrad = as_cuda_ndarray_variable(topgrad)
+        output = as_cuda_ndarray_variable(output)
+        if kern.type.ndim != 5:
+            raise TypeError('kern must be 5D tensor')
+        if topgrad.type.ndim != 5:
+            raise TypeError('topgrad must be 5D tensor')
+        if output.type.ndim != 5:
+            raise TypeError('output must be 5D tensor')
+
+        if not isinstance(desc.type, CDataType) \
+                or desc.type.ctype != 'cudnnConvolutionDescriptor_t':
+            raise TypeError('desc must be cudnnConvolutionDescriptor_t')
+
+        alpha = ensure_float(alpha, _one, 'alpha')
+        beta = ensure_float(beta, _zero, 'beta')
+
+        return Apply(self, [kern, topgrad, output, desc, alpha, beta],
+                     [output.type()])
+
+    def infer_shape(self, node, shape):
+        return [shape[2]]
+
+    # TODO: reenable constant folding
+    def do_constant_folding(self, node):
+        # Needed as we do not want to cache this information.
+        return False
+    
+    # TODO: reenable caching
+    def c_code_cache_version(self):
+        # TODO: set true again
+        from time import time
+        return int(time() * 100)# always recompile
+        #return (2, version())

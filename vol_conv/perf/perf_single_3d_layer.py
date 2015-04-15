@@ -1,5 +1,6 @@
 from vol_conv.test_data import generate_test_data
 from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
+from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
 import argparse
 from perf_layers import create_fprop_layer3d_function 
 from numpy.random import RandomState
@@ -69,6 +70,7 @@ def parse_command_line_arguments():
 
 _layername_to_class_dict = {
         'cudnn': CuDnnConv3dElemwise,
+        'cublas': CuBlasConv3dElemwise,
         }
 
 

@@ -6,9 +6,9 @@ APPLY_SPECIFIC(conv_gw)(CudaNdarray *input, CudaNdarray *output,
                         float alpha, float beta, CudaNdarray **kerns) {
   cudnnStatus_t err = CUDNN_STATUS_SUCCESS;
 
-  if (c_set_tensor4d(input, APPLY_SPECIFIC(input)) == -1)
+  if (c_set_tensor5d(input, APPLY_SPECIFIC(input)) == -1)
     return 1;
-  if (c_set_tensor4d(output, APPLY_SPECIFIC(output)) == -1)
+  if (c_set_tensor5d(output, APPLY_SPECIFIC(output)) == -1)
     return 1;
 
 #ifdef CONV_INPLACE
@@ -16,13 +16,13 @@ APPLY_SPECIFIC(conv_gw)(CudaNdarray *input, CudaNdarray *output,
   *kerns = km;
   Py_INCREF(*kerns);
 #else
-  if (CudaNdarray_prep_output(kerns, 4, CudaNdarray_HOST_DIMS(km)) != 0)
+  if (CudaNdarray_prep_output(kerns, 5, CudaNdarray_HOST_DIMS(km)) != 0)
     return 1;
   if (beta != 0.0 && CudaNdarray_CopyFromCudaNdarray(*kerns, km))
     return 1;
 #endif
 
-  if (c_set_filter(*kerns, APPLY_SPECIFIC(kerns)) == -1)
+  if (c_set_filter5d(*kerns, APPLY_SPECIFIC(kerns)) == -1)
     return 1;
 
   err = cudnnConvolutionBackwardFilter(

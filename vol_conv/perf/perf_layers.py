@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from vol_conv.test_data import generate_test_data
 from pylearn2.models.mlp import ConvElemwise, IdentityConvNonlinearity
-
+""" Transform this into test instead!!!"""
 import theano
 import theano.misc.pycuda_init
 from vol_conv.convolutions import  compute_out_shape, vectorized_conv
@@ -20,7 +20,7 @@ from vol_conv.volumetric_space import Conv3DSpace
 from numpy.random import RandomState
 import theano.sandbox.cuda
 import gc
-from theano.sandbox.cuda.basic_ops import gpu_from_host
+from theano.sandbox.cuda.basic_ops import gpu_from_host, gpu_contiguous
 # 5 dimensional tensor type for 3d convolutions:
 ftensor5 = T.TensorType('float32', (False,)*5)
 
@@ -121,10 +121,30 @@ def create_fprop_layer2d_function(inputs_shape, filters, bias, conv_layer_class)
     conv_2d_layer.set_biases(bias)
     inputs_2d_theano = T.ftensor4()
     conv2d_result = conv_2d_layer.fprop(inputs_2d_theano)
+    # keep variable on gpu for perfing
+    if (theano.config.device.startswith('gpu')):
+        conv2d_result = gpu_from_host(conv2d_result)
     conv2d = theano.function([inputs_2d_theano], conv2d_result)
     return conv2d, conv_2d_layer
 
 def create_fprop_layer3d_function(inputs_shape, filters, bias, conv_layer_class):
+    inputs_3d_theano = ftensor5()
+    conv_3d_layer = create_layer3d(inputs_shape, filters,
+        bias, conv_layer_class)
+    conv3d_result = create_fprop_layer_3d(conv_3d_layer, 
+        inputs_3d_theano)
+    conv3d = theano.function([inputs_3d_theano], conv3d_result)
+    return conv3d, conv_3d_layer
+
+def create_fprop_layer_3d_symbolic(inputs_shape, filters,
+        bias, conv_layer_class, inputs_3d_theano):
+    conv_3d_layer = create_layer3d(inputs_shape, filters,
+        bias, conv_layer_class)
+    conv3d_result = create_fprop_layer_3d(conv_3d_layer, 
+        inputs_3d_theano)
+    return conv3d_result
+
+def create_layer3d(inputs_shape, filters, bias, conv_layer_class):
     # mlp variable needed for setting input space, rng is ignorable (filters 
     # bias are reset to given values at end of this function)
     mlp = FakeMLP(rng=np.random,batch_size=inputs_shape[0])
@@ -135,17 +155,21 @@ def create_fprop_layer3d_function(inputs_shape, filters, bias, conv_layer_class)
         layer_name='conv3d_lin', nonlinearity=IdentityConvNonlinearity(),
         irange=0.001)
     conv_3d_layer.set_mlp(mlp)
-    
     conv_3d_layer.set_input_space(conv_3d_input_space)
-    # convert filters to correct axes (('b', 0, 1, 2, 'c') are test data axes)
+    # convert filters to correct axes (('b', 0, 1, 2, ' c') are test data axes)
     converted_filters = Conv3DSpace.convert_numpy(filters, 
         ('b', 0, 1, 2, 'c'), conv_3d_layer.detector_space.axes)
     conv_3d_layer.set_weights(converted_filters)
     conv_3d_layer.set_biases(bias)
-    inputs_3d_theano = ftensor5()
+    return conv_3d_layer
+ 
+def create_fprop_layer_3d(conv_3d_layer, inputs_3d_theano):
     conv3d_result = conv_3d_layer.fprop(inputs_3d_theano)
-    conv3d = theano.function([inputs_3d_theano], conv3d_result)
-    return conv3d, conv_3d_layer
+    # keep variable on gpu for perfing
+    # Lets remove for now, we will perf differently anyways most likely
+    #if (theano.config.device.startswith('gpu')):
+    #    conv3d_result = gpu_from_host(conv3d_result)
+    return conv3d_result
 
 def compute_first_result(function_and_names, inputs):
     """ Convenience function for computing a reference result for all tests. """
@@ -188,9 +212,9 @@ def parse_command_line_arguments():
         description="""Performance experiments for 3d convolution layers.
         Example: ./perf_layers --inputs 15 3 4 5 1 --filters 12 3 4 5 1"""
     )
-    parser.add_argument('--inputs', nargs='*', default=[6, 5, 6, 2, 3],
+    parser.add_argument('--inputs', nargs='*', default=[20, 35, 16, 20, 3],
                         help='''Shape of the inputs.''')
-    parser.add_argument('--filters', nargs='*', default=[4, 2, 6, 1, 3],
+    parser.add_argument('--filters', nargs='*', default=[5, 14, 6, 3, 3],
                         help='''Shape of the filters.''')
     args = parser.parse_args()
     # conver to int

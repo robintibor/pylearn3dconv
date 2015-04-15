@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
   int inputDimA[] = {32, 3, 80, 80, 40};
   //int inputDimA[] = {64, 3, 80, 80, 40};
   int filterDimA[] = {32, 3, 5, 5, 5};
+  //int filterDimA[] = {64, 3, 5, 5, 5};
   int filterStrideA[] = {1,1,1};
   int convDims = 3;
   int padA[] = {0,0,0};
@@ -74,10 +75,9 @@ int main(int argc, char** argv) {
   checkCudnnErrors(cudnnSetFilterNdDescriptor(filter_desc, CUDNN_DATA_FLOAT,
       nbDims, filterDimA));
 
-  int outputDimA[] = {32,32,76,76,36};
-  //int outputDimA[nbDims];
-  //cudnnGetConvolutionNdForwardOutputDim(convDesc, input_desc, filter_desc,
-   //   nbDims, outputDimA);
+  int outputDimA[nbDims];
+  cudnnGetConvolutionNdForwardOutputDim(convDesc, input_desc, filter_desc,
+      nbDims, outputDimA);
   int outputStrideA[nbDims];
   computeStrides(outputDimA, nbDims, outputStrideA);
 
@@ -103,9 +103,7 @@ int main(int argc, char** argv) {
   size_t inputTotalDimension = productOfDimensions(inputDimA, nbDims);
   size_t filterTotalDimension = productOfDimensions(filterDimA, nbDims);
   size_t outputTotalDimension = productOfDimensions(outputDimA, nbDims);
-  checkCudaErrors(cudaMalloc(&srcData, inputTotalDimension*sizeof(float)));
-  checkCudaErrors(cudaMalloc(&filterData, filterTotalDimension*sizeof(float)));
-  checkCudaErrors(cudaMalloc(&dstData, outputTotalDimension*sizeof(float)));
+
 
   // Fill with values
   float* inputHost = new float[inputTotalDimension];
@@ -116,17 +114,22 @@ int main(int argc, char** argv) {
   for (int i = 0; i < filterTotalDimension; ++i) {
     filterHost[i] = (float)rand()/(float)(RAND_MAX);
   }
-  cudaMemcpy(srcData, inputHost, inputTotalDimension*sizeof(float),
-      cudaMemcpyHostToDevice);
+
+  checkCudaErrors(cudaMalloc(&filterData, filterTotalDimension*sizeof(float)));
+  checkCudaErrors(cudaMalloc(&dstData, outputTotalDimension*sizeof(float)));
+
+  checkCudaErrors(cudaMalloc(&srcData, inputTotalDimension*sizeof(float)));
+
   cudaMemcpy(filterData, filterHost, filterTotalDimension*sizeof(float),
+      cudaMemcpyHostToDevice);
+  struct timeval tval_before, tval_after, tval_result;
+  gettimeofday(&tval_before, NULL);
+  cudaMemcpy(srcData, inputHost, inputTotalDimension*sizeof(float),
       cudaMemcpyHostToDevice);
   delete filterHost;
   delete inputHost;
   float alpha = 1;
   float beta = 0;
-
-  struct timeval tval_before, tval_after, tval_result;
-  gettimeofday(&tval_before, NULL);
 
   checkCudnnErrors(cudnnConvolutionForward(context_handle, &alpha, input_desc,
       srcData, filter_desc, filterData, convDesc,
@@ -138,33 +141,33 @@ int main(int argc, char** argv) {
   double timeDiffInMs = (tval_result.tv_sec * 1000) +
       (tval_result.tv_usec / 1000.0);
   printf("Time elapsed %5.2f ms\n", timeDiffInMs);
+
   float* result = new float[outputTotalDimension];
-
-
   checkCudaErrors( cudaMemcpy(result, dstData,
       outputTotalDimension*sizeof(float), cudaMemcpyDeviceToHost));
 
-  printf("random output %f\n", result[outputTotalDimension - 1]);
+  // prevent that computation is compiled away by optimization
+  double checkSumForPerf = 0;
+  for (int i = 0; i < outputTotalDimension; ++i) {
+    checkSumForPerf += result[i];
+  }
+  printf("random checksum %f\n", checkSumForPerf);
   delete result;
-
-
-          //( cudaMemcpy(srcData, imgData_h,
-             //                         IMAGE_H*IMAGE_W*sizeof(value_type),
-              //                        cudaMemcpyHostToDevice) );
+  // now lets do backward / gradient
+  // lets just put it on input
+  // lets use fake top gradient, just use output itself
+  // reuse allocated input memory for gradient(!)
+  checkCudnnErrors(cudnnConvolutionBackwardData(context_handle,
+      &alpha, filter_desc, filterData, output_desc, dstData, convDesc, &beta,
+      input_desc, srcData));
+  float* resultGrad = new float[inputTotalDimension];
+  checkCudaErrors(cudaMemcpy(resultGrad, srcData,
+      inputTotalDimension*sizeof(float), cudaMemcpyDeviceToHost));
+  checkSumForPerf = 0;
+   for (int i = 0; i < inputTotalDimension; ++i) {
+     checkSumForPerf += resultGrad[i];
+   }
+   printf("random checksum grad %f\n", checkSumForPerf);
 
 
 }
-// TODELAY: delete this?
-// check for output dim
-/*
-int tensorOutputDimA[5];
-
-err = cudnnGetConvolutionNdForwardOutputDim(convDesc, input_desc, filter_desc,
-    nbDims, tensorOutputDimA);
-printf("Output: ");
-int i;
-for (i = 0; i < 5; ++i) {
-  printf("%d ", tensorOutputDimA[i]);
-}
-printf("\n");
-printf("success getting output dim: %d\n", CUDNN_STATUS_SUCCESS == err);*/

@@ -8,4 +8,3 @@ clean:
 
 %_main: %_main.cu
 	nvcc $(COMPILER_FLAGS) $@.cu -o $@
-

@@ -19,16 +19,19 @@ class CuDnn3dConv():
             reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
             x = x.dimshuffle(*reshuffle_arr)
         x  = gpu_contiguous(x)
+        # TODO: check if necessary gpu_contigous of filters.. maybe remove if
+        # all tests work fine without 
+        filters = gpu_contiguous(self.filters)
         desc = GpuDnnConv3dDesc(subsample=tuple(self.kernel_stride), 
             conv_mode='cross')()
         
         desc_op = desc.owner.op
-        out_shp = GpuDnn3dConv.get_out_shape(x.shape, self.filters.shape,
+        out_shp = GpuDnn3dConv.get_out_shape(x.shape, filters.shape,
                                            desc_op.subsample)
         
         
         out = gpu_alloc_empty(*out_shp)
-        rval = GpuDnn3dConv()(x, self.filters, out, desc)
+        rval = GpuDnn3dConv()(x, filters, out, desc)
         rval = rval + self.bias.dimshuffle('x', 0, 'x', 'x', 'x')
 
         output_axes = self.output_axes

@@ -141,7 +141,6 @@ class Conv3dElemwise(Layer):
                                      str(type(space)))
 
         rng = self.mlp.rng
-
         # output shape determined by input/kernel shapes and stride
         output_shape = [int((self.input_space.shape[i] - 
                             self.kernel_shape[i]) / 

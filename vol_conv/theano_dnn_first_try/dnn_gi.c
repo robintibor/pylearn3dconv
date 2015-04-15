@@ -5,10 +5,9 @@ APPLY_SPECIFIC(conv_gi)(CudaNdarray *kerns, CudaNdarray *output,
                         CudaNdarray *im, cudnnConvolutionDescriptor_t desc,
                         float alpha, float beta, CudaNdarray **input) {
   cudnnStatus_t err = CUDNN_STATUS_SUCCESS;
-
-  if (c_set_tensor4d(output, APPLY_SPECIFIC(output)) == -1)
+  if (c_set_tensor5d(output, APPLY_SPECIFIC(output)) == -1)
     return 1;
-  if (c_set_filter(kerns, APPLY_SPECIFIC(kerns)) == -1)
+  if (c_set_filter5d(kerns, APPLY_SPECIFIC(kerns)) == -1)
     return 1;
 
 #ifdef CONV_INPLACE
@@ -16,13 +15,13 @@ APPLY_SPECIFIC(conv_gi)(CudaNdarray *kerns, CudaNdarray *output,
   *input = im;
   Py_INCREF(*input);
 #else
-  if (CudaNdarray_prep_output(input, 4, CudaNdarray_HOST_DIMS(im)) != 0)
+  if (CudaNdarray_prep_output(input, 5, CudaNdarray_HOST_DIMS(im)) != 0)
     return 1;
   if (beta != 0.0 && CudaNdarray_CopyFromCudaNdarray(*input, im))
     return 1;
 #endif
 
-  if (c_set_tensor4d(*input, APPLY_SPECIFIC(input)) == -1)
+  if (c_set_tensor5d(*input, APPLY_SPECIFIC(input)) == -1)
     return 1;
 
   err = cudnnConvolutionBackwardData(
@@ -34,7 +33,7 @@ APPLY_SPECIFIC(conv_gi)(CudaNdarray *kerns, CudaNdarray *output,
     (void *)&beta,
     APPLY_SPECIFIC(input), CudaNdarray_DEV_DATA(*input));
   if (err != CUDNN_STATUS_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "GpuDnnConvGradI: error doing operation: %s",
+    PyErr_Format(PyExc_RuntimeError, "GpuDnn3dConvGradI: error doing operation: %s",
                  cudnnGetErrorString(err));
     return 1;
   }
