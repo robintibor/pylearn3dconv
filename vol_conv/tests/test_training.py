@@ -24,31 +24,103 @@ from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
 from vol_conv.test_data import generate_test_data
 
-""" Set globally to only compute them once"""
-inputs = None
-filters = None
-bias = None
+def test_training():
+    inputs_shape = [100,7,6,5,3]
+    filters_shape = [11,4,3,2,3]
+    # First with no stride and no pooling
+    print("No stride no pooling")
+    kernel_stride = [1, 1, 1]
+    pool_type = None
+    pool_shape = [1,1,1]
+    pool_stride = [1,1,1]
+    expected_results = {'train': [0.58, 0.88, 0.96, 0.98, 1.0],
+         'valid': [0.72, 0.76, 0.92, 0.96, 1.0],
+         'test': [0.56, 0.6, 0.8, 0.96, 0.96],
+       }
+    
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3dConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuBlasConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuDnnConv3dElemwise, expected_results)
 
-def setup_training(inputs_shape, filters_shape, kernel_stride, conv_layer_class):
-    """ Setup model, prediction function, algorithm for training"""
-    global inputs, filters, bias
+    # Then with stride
+    print("Stride and no pooling")
+    kernel_stride = [2, 1, 2]
+    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
+         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
+         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
+       }
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3dConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuBlasConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuDnnConv3dElemwise, expected_results)
+    # Then with stride and fake pooling expect same results as without pooling
+    print("Stride and fake pooling")
+    pool_type = 'max'
+    pool_shape = [1,1,1]
+    pool_stride = [1,1,1]
+    kernel_stride = [2, 1, 2]
+    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
+         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
+         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
+       }
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3dConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuBlasConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuDnnConv3dElemwise, expected_results)
+    # Then with stride and real pooling
+    print("real pooling...should fail as its not implemented")
+    pool_type = 'max'
+    pool_shape = [1,1,1]
+    pool_stride = [1,1,1]
+    kernel_stride = [2, 1, 2]
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3dConv3dElemwise,
+        {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
+         'test': [0.56, 0.88, 0.96, 1.0, 1.0],
+       })
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        Theano3d2dConv3dElemwise,
+        {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
+         'test': [0.56, 0.84, 0.92, 1.0, 1.0],
+       })
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        CuBlasConv3dElemwise,
+        {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
+         'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
+         'test': [0.84, 0.84, 0.92, 0.96, 0.96],
+       })
+
+
+def expect_results(inputs_shape, filters_shape, kernel_stride, conv_layer_class, 
+    expected_results):
     # a great seed is half the work :)
     rng = RandomState(hash('tobipuma') % 4294967295)
-    if inputs is None:
-        # Only generate once so you can switch order of experiments without
-        # changing inputs
-        # Normally this should not be necessary as we set the seed of the random
-        # state. But still it leads to different results for some reason
-        # I don't understand.
-        # maybe related to this: 
-        # http://stackoverflow.com/questions/27732543/why-does-creation-of-a-theano-shared-variable-on-gpu-effect-numpys-random-strea
-        inputs, filters, bias = generate_test_data(rng, inputs_shape, 
-            filters_shape)
+    inputs, filters, bias = generate_test_data(rng, inputs_shape, filters_shape)
+    mlp_fprop, train_set, valid_set, test_set, algorithm = setup_training(
+        inputs, filters, bias, kernel_stride, conv_layer_class)
+    run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
+        expected_results)
+    print conv_layer_class.__name__ + " - Ok."
+
+
+
+def setup_training(inputs, filters, bias, kernel_stride, conv_layer_class):
+    """ Setup model, prediction function, algorithm for training"""
     train_set, valid_set, test_set = generate_datasets(inputs)
-    mlp = construct_model(inputs_shape, filters, bias, kernel_stride, 
+    mlp = construct_model(inputs.shape, filters, bias, kernel_stride, 
         conv_layer_class)
     mlp_fprop = construct_predict_function(mlp)
     algorithm = create_algorithm(mlp, train_set)
+    
     return mlp_fprop, train_set, valid_set, test_set, algorithm
 
 def generate_datasets(inputs):
@@ -92,7 +164,9 @@ def construct_predict_function(mlp):
     return mlp_fprop
 
 def create_algorithm(mlp, train_set):
+    rng = RandomState(hash('tobipuma') % 4294967295)
     algorithm = SGD(batch_size=20, learning_rate=0.1)
+    algorithm.rng = rng #try to always have same results for algorithm
     algorithm.setup(mlp, train_set)
     return algorithm
 
@@ -127,124 +201,6 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
                 algorithm.model.layers[0].__class__.__name__,
                 expected_results[setname], 
                 np.round(results[setname], decimals=2).tolist())
-
-def expect_results(inputs_shape, filters_shape, kernel_stride, conv_layer_class, 
-    expected_results):
-    mlp_fprop, train_set, valid_set, test_set, algorithm = setup_training(
-        inputs_shape, filters_shape, kernel_stride, conv_layer_class)
-    run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
-        expected_results)
-    print conv_layer_class.__name__ + " - Ok."
-
-def test_training():
-    inputs_shape = [100,7,6,5,3]
-    filters_shape = [11,4,3,2,3]
-    # First with no stride and no pooling
-    kernel_stride = [1, 1, 1]
-    pool_type = None
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
-    
-
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3dConv3dElemwise,
-        {'train': [0.58, 0.92, 0.84, 1.0, 1.0],
-         'valid': [0.72, 0.88, 0.84, 0.84, 0.84],
-         'test': [0.56, 0.88, 0.64, 0.96, 0.96],
-       })
-    
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3d2dConv3dElemwise,
-        {'train': [0.76, 0.82, 1.0, 1.0, 1.0],
-         'valid': [0.84, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.64, 0.84, 1.0, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuBlasConv3dElemwise,
-        {'train': [0.66, 0.46, 0.22, 1.0, 1.0],
-         'valid': [0.76, 0.44, 0.24, 1.0, 1.0],
-         'test': [0.64, 0.52, 0.36, 1.0, 1.0],
-       })
-    
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuDnnConv3dElemwise,
-        {'train': [0.66, 0.26, 0.2, 0.74, 0.78],
-         'valid': [0.76, 0.24, 0.24, 0.76, 0.84],
-         'test':  [0.64, 0.32, 0.36, 0.76, 0.84],
-       })
-    
-    # Then with stride
-    kernel_stride = [2, 1, 2]
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3dConv3dElemwise,
-        {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.56, 0.88, 0.96, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3d2dConv3dElemwise,
-        {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
-         'test': [0.56, 0.84, 0.92, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuBlasConv3dElemwise,
-        {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
-         'test': [0.84, 0.84, 0.92, 0.96, 0.96],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuDnnConv3dElemwise,
-        {'train': [0.66, 1.0, 0.42, 0.5, 0.74],
-         'valid': [0.6, 1.0, 0.28, 0.44, 0.8],
-         'test': [0.76, 0.96, 0.48, 0.52, 0.76],
-       })
-    # Then with stride and fake pooling
-    pool_type = 'max'
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
-    kernel_stride = [2, 1, 2]
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3dConv3dElemwise,
-        {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.56, 0.88, 0.96, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3d2dConv3dElemwise,
-        {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
-         'test': [0.56, 0.84, 0.92, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuBlasConv3dElemwise,
-        {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
-         'test': [0.84, 0.84, 0.92, 0.96, 0.96],
-       })
-    # Then with stride and real pooling
-    pool_type = 'max'
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
-    kernel_stride = [2, 1, 2]
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3dConv3dElemwise,
-        {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
-         'test': [0.56, 0.88, 0.96, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3d2dConv3dElemwise,
-        {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
-         'test': [0.56, 0.84, 0.92, 1.0, 1.0],
-       })
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuBlasConv3dElemwise,
-        {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
-         'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
-         'test': [0.84, 0.84, 0.92, 0.96, 0.96],
-       })
 
 if __name__ == '__main__':
     test_training()
