@@ -66,7 +66,8 @@ import theano
 from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            host_from_gpu,
                                            gpu_contiguous, HostFromGpu,
-                                           gpu_alloc_empty)
+                                           gpu_alloc_empty,
+                                           gpu_from_host)
 from theano.sandbox.cuda.dnn import GpuDnnConv, GpuDnnConvDesc
 from numpy.random import RandomState
 from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnnPool3dDesc
@@ -150,12 +151,10 @@ def create_dnn_pool_func(pool_shape, pool_stride):
     max_pool_dnn_func = theano.function([input_dnn], outputdnn)
     return max_pool_dnn_func
 
-def dnn_pool3d(pool_shape, pool_stride, image_shape):
-    
-    input_dnn = ftensor5()
+def dnn_pool3d2d(inputs, pool_shape, pool_stride, image_shape):
     first_2d_pooled_outputs = []
     for z in range(image_shape[2]):
-        pooled_slice = dnn_pool(input_dnn[:,:,:,:,z], ws=pool_shape[0:2], 
+        pooled_slice = dnn_pool(inputs[:,:,:,:,z], ws=pool_shape[0:2], 
             stride=pool_stride[0:2], mode='max')
         first_2d_pooled_outputs.append(pooled_slice)
     
@@ -174,35 +173,13 @@ def dnn_pool3d(pool_shape, pool_stride, image_shape):
     
     final_output = T.stack(final_outputs)[0,:,:,:,:,:]     
     final_output = final_output.dimshuffle(1,2,3,0,4)
-        
     return final_output
 
-def create_dnn_3dpool_func(pool_shape, pool_stride, image_shape):
-    
+def create_dnn_3d2dpool_func(pool_shape, pool_stride, image_shape):
     input_dnn = ftensor5()
-    first_2d_pooled_outputs = []
-    for z in range(image_shape[2]):
-        pooled_slice = dnn_pool(input_dnn[:,:,:,:,z], ws=pool_shape[0:2], 
-            stride=pool_stride[0:2], mode='max')
-        first_2d_pooled_outputs.append(pooled_slice)
-    
-    first_2d_pooled_output = T.stack(first_2d_pooled_outputs)[0,:,:,:,:,:]
-    first_2d_pooled_output = first_2d_pooled_output.dimshuffle(1,2,3,4,0)
-    # now 1d-pool over last dimension...
-    # coudl use first or second dimension as input fo pool1d..
-    # compute maximum y index after first pooling
-    max_y = ((image_shape[1] - pool_shape[1]) // pool_stride[1]) + 1
-    final_outputs = []
-    for y in range(max_y):
-        final_pooled_slice = dnn_pool(first_2d_pooled_output[:,:,:,y,:], 
-            ws=(1, pool_shape[2]), 
-            stride=(1, pool_stride[2]), mode='max')
-        final_outputs.append(final_pooled_slice)
-    
-    final_output = T.stack(final_outputs)[0,:,:,:,:,:]     
-    final_output = final_output.dimshuffle(1,2,3,0,4)
-        
-    max_3dpool_dnn_func = theano.function([input_dnn], final_output)
+    pool_result = dnn_pool3d2d(input_dnn, pool_shape, pool_stride, image_shape)
+    pool_result =    gpu_from_host(pool_result)
+    max_3dpool_dnn_func = theano.function([input_dnn], pool_result)
     return max_3dpool_dnn_func
 
 
@@ -238,21 +215,36 @@ assert np.sum(np.square(dnn_result - numpy_result)) < 1e-4
  """
  
 input_shape = [5,2,8,7,6]#bc012
+input_shape = [40,3,30,80,20]#bc012
 pool_shape = (3,4,2)
 pool_stride = (3,1,4)
+image_shape = input_shape[2:]
 inputs = rng.normal(size=input_shape).astype(np.float32)
-dnn_3d_func = create_dnn_3dpool_func(pool_shape, pool_stride, input_shape[2:])
-dnn_3d_result = dnn_3d_func(inputs)
-print("dnn 3d shape")
-print dnn_3d_result.shape
 numpy_result = max_pool_3d_numpy(inputs, pool_shape, pool_stride)
 print "numpy shape"
 print numpy_result.shape
 dnn_3d_2d_result = max_pool_3d_2d(inputs, pool_shape, pool_stride)
 print "dnn"
 print dnn_3d_2d_result.shape
+dnn_3d_func = create_dnn_3d2dpool_func(pool_shape, pool_stride, image_shape)
+dnn_3d_result = dnn_3d_func(inputs)
+print("dnn 3d shape")
+print dnn_3d_result.shape
 assert np.sum(np.square(dnn_3d_2d_result - numpy_result)) < 1e-4
 assert np.sum(np.square(dnn_3d_2d_result - dnn_3d_result)) < 1e-4
 
 
- 
+## Gradient possible??
+input_dnn = ftensor5()
+pool_result = dnn_pool3d2d(input_dnn, pool_shape, pool_stride, image_shape)
+cost = T.sum(pool_result)
+gradient = T.grad(cost, input_dnn)
+  
+gradfunc = theano.function([input_dnn], gradient)      
+gradient_result = gradfunc(inputs)
+print gradient_result.shape
+#print gradient_result
+
+from vol_conv.perf.perf import perf_func_print_results
+perf_func_print_results("dnn_pool3d2d", dnn_3d_func, None, inputs)
+perf_func_print_results("dnn_pool3d2d_gradient", gradfunc, None, inputs)

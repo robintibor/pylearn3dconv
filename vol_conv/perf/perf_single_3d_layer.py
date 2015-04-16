@@ -2,10 +2,10 @@ from vol_conv.test_data import generate_test_data
 from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
 from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
 import argparse
-from perf_layers import create_fprop_layer3d_function 
+from vol_conv.perf_layers import create_fprop_layer3d_function 
 from numpy.random import RandomState
 import numpy as np
-from perf import perf_func
+from vol_conv.perf import perf_func
 from vol_conv.volumetric_space import Conv3DSpace
 import gc
 from theano import shared
