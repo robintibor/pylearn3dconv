@@ -150,11 +150,66 @@ def create_dnn_pool_func(pool_shape, pool_stride):
     max_pool_dnn_func = theano.function([input_dnn], outputdnn)
     return max_pool_dnn_func
 
+def dnn_pool3d(pool_shape, pool_stride, image_shape):
+    
+    input_dnn = ftensor5()
+    first_2d_pooled_outputs = []
+    for z in range(image_shape[2]):
+        pooled_slice = dnn_pool(input_dnn[:,:,:,:,z], ws=pool_shape[0:2], 
+            stride=pool_stride[0:2], mode='max')
+        first_2d_pooled_outputs.append(pooled_slice)
+    
+    first_2d_pooled_output = T.stack(first_2d_pooled_outputs)[0,:,:,:,:,:]
+    first_2d_pooled_output = first_2d_pooled_output.dimshuffle(1,2,3,4,0)
+    # now 1d-pool over last dimension...
+    # coudl use first or second dimension as input fo pool1d..
+    # compute maximum y index after first pooling
+    max_y = ((image_shape[1] - pool_shape[1]) // pool_stride[1]) + 1
+    final_outputs = []
+    for y in range(max_y):
+        final_pooled_slice = dnn_pool(first_2d_pooled_output[:,:,:,y,:], 
+            ws=(1, pool_shape[2]), 
+            stride=(1, pool_stride[2]), mode='max')
+        final_outputs.append(final_pooled_slice)
+    
+    final_output = T.stack(final_outputs)[0,:,:,:,:,:]     
+    final_output = final_output.dimshuffle(1,2,3,0,4)
+        
+    return final_output
+
+def create_dnn_3dpool_func(pool_shape, pool_stride, image_shape):
+    
+    input_dnn = ftensor5()
+    first_2d_pooled_outputs = []
+    for z in range(image_shape[2]):
+        pooled_slice = dnn_pool(input_dnn[:,:,:,:,z], ws=pool_shape[0:2], 
+            stride=pool_stride[0:2], mode='max')
+        first_2d_pooled_outputs.append(pooled_slice)
+    
+    first_2d_pooled_output = T.stack(first_2d_pooled_outputs)[0,:,:,:,:,:]
+    first_2d_pooled_output = first_2d_pooled_output.dimshuffle(1,2,3,4,0)
+    # now 1d-pool over last dimension...
+    # coudl use first or second dimension as input fo pool1d..
+    # compute maximum y index after first pooling
+    max_y = ((image_shape[1] - pool_shape[1]) // pool_stride[1]) + 1
+    final_outputs = []
+    for y in range(max_y):
+        final_pooled_slice = dnn_pool(first_2d_pooled_output[:,:,:,y,:], 
+            ws=(1, pool_shape[2]), 
+            stride=(1, pool_stride[2]), mode='max')
+        final_outputs.append(final_pooled_slice)
+    
+    final_output = T.stack(final_outputs)[0,:,:,:,:,:]     
+    final_output = final_output.dimshuffle(1,2,3,0,4)
+        
+    max_3dpool_dnn_func = theano.function([input_dnn], final_output)
+    return max_3dpool_dnn_func
+
+
 from pylearn2.models.mlp import max_pool  
 from theano.sandbox.cuda.dnn import dnn_pool  
 rng = RandomState(np.uint32(hash('tobiderpuma')))
 
-pool_desc = GpuDnnPool3dDesc((3,3,4),(2,7,1), 'max', (0,0,0))()
 
 """    
 input_shape = [5,2,8,7] # bc01
@@ -178,10 +233,18 @@ numpy_result = max_pool_numpy(inputs, pool_shape, pool_stride)
 
 assert np.sum(np.square(dnn_result - numpy_result)) < 1e-4
 
+
+
+ """
+ 
 input_shape = [5,2,8,7,6]#bc012
 pool_shape = (3,4,2)
 pool_stride = (3,1,4)
 inputs = rng.normal(size=input_shape).astype(np.float32)
+dnn_3d_func = create_dnn_3dpool_func(pool_shape, pool_stride, input_shape[2:])
+dnn_3d_result = dnn_3d_func(inputs)
+print("dnn 3d shape")
+print dnn_3d_result.shape
 numpy_result = max_pool_3d_numpy(inputs, pool_shape, pool_stride)
 print "numpy shape"
 print numpy_result.shape
@@ -189,8 +252,7 @@ dnn_3d_2d_result = max_pool_3d_2d(inputs, pool_shape, pool_stride)
 print "dnn"
 print dnn_3d_2d_result.shape
 assert np.sum(np.square(dnn_3d_2d_result - numpy_result)) < 1e-4
+assert np.sum(np.square(dnn_3d_2d_result - dnn_3d_result)) < 1e-4
 
 
- """
- 
  

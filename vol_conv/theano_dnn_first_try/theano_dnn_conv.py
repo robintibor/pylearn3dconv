@@ -856,9 +856,17 @@ if (err%(name)s != CUDNN_STATUS_SUCCESS) {
         # not connected to desc
         return [[1], [0]]"""
 
+    # TODO: reenable constant folding
+    def do_constant_folding(self, node):
+        # Needed as we do not want to cache this information.
+        return False
+    
+    # TODO: reenable caching
     def c_code_cache_version(self):
-        return (6, version())
-
+        # TODO: set true again
+        from time import time
+        return int(time() * 100)# always recompile
+        #return (2, version())
 
 
 

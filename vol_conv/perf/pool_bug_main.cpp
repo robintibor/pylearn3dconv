@@ -37,7 +37,7 @@ void computeStrides(const int* dims, int nbDims, int* strides) {
 
 int main(int argc, char** argv) {
   if (argc != 2) {
-    printf("Usage:\n./volumeric_in_c [device_number]\n");
+    printf("Usage:\n./pool_bug_main [device_number]\n");
     return 1;
   }
   // Set device
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
   cudnnCreateTensorDescriptor(&input_desc);
   cudnnCreateTensorDescriptor(&output_desc);
   cudnnCreatePoolingDescriptor(&pool_desc);
-  int nbDims = 5;  /*
+    /*
   Input descriptor
   Float: 1
   nbDims: 5
@@ -73,13 +73,40 @@ int main(int argc, char** argv) {
   */
   // Set variable dimensions
   // b c 0 1 2 format
+  cudnnPoolingMode_t pool_mode = CUDNN_POOLING_MAX;
+  float alpha = 1;
+  float beta = 0;
+  /* original bug version:
+  int nbDims = 5;
+  int poolDims = 3;
   int inputDimA[] = {5,3,4,8,2};
   int outputDimA[] = {5,3,2,1,2};
 
-  int poolDims = 3;
   int poolShapeA [] = {2, 2, 1};
   int poolPadA[] = {0,0,0};
   int poolStrideA [] = {2, 7, 1};
+   */
+  /* Working 2d version
+
+  int nbDims = 4;
+  int poolDims = 2;
+  int inputDimA[] = {1,1,1,1};
+  int outputDimA[] = {1,1,1,1};
+
+  int poolShapeA [] = {1,1};
+  int poolPadA[] = {0,0};
+  int poolStrideA [] = {1, 1};
+
+   */
+
+  int nbDims = 5;
+  int poolDims = 3;
+  int inputDimA[5] = {4,4,10,10,10};
+  int outputDimA[5] = {4,4,5,5,5};
+
+  int poolShapeA [3] = {2,2,2};
+  int poolPadA[3] = {0,0,0};
+  int poolStrideA [3] = {2,2,2};
 
 
   int inputStrideA[nbDims];
@@ -103,11 +130,13 @@ int main(int argc, char** argv) {
 
   float* inputHost = new float[inputTotalDimension];
   for (int i = 0; i < inputTotalDimension; ++i) {
-    inputHost[i] = (float)rand()/(float)(RAND_MAX);
+    //inputHost[i] = (float)rand()/(float)(RAND_MAX);
+    inputHost[i] = 1;
   }
   float* outputHost = new float[outputTotalDimension];
   for (int i = 0; i < outputTotalDimension; ++i) {
-    outputHost[i] = (float)rand()/(float)(RAND_MAX);
+    //outputHost[i] = (float)rand()/(float)(RAND_MAX);
+    outputHost[i] = 1;
   }
 
 
@@ -122,18 +151,17 @@ int main(int argc, char** argv) {
       cudaMemcpyHostToDevice));
   checkCudaErrors(cudaMemcpy(dstData, outputHost, outputTotalDimension*sizeof(float),
       cudaMemcpyHostToDevice));
-  delete inputHost;
-  delete outputHost;
+  //delete inputHost;
+  //delete outputHost;
 
   checkCudnnErrors(cudnnSetPoolingNdDescriptor(
     pool_desc,
-    CUDNN_POOLING_MAX,
+    pool_mode,
     poolDims,
     poolShapeA,
     poolPadA,
     poolStrideA
     ));
-
 
 
 
@@ -202,6 +230,7 @@ int main(int argc, char** argv) {
       strideA);
       printf("Pooling descriptor\n");
       printf("nbDims: %d\n", nbDims);
+      printf("mode: %d\n", mode);
       printf("Shape: ");
       for (int i = 0; i < nbDims; ++i) {
         printf("%d ", dimA[i]);
@@ -221,8 +250,6 @@ int main(int argc, char** argv) {
 
       }
   // PRINTING END
-  float alpha = 1;
-  float beta = 0;
   checkCudnnErrors(cudnnPoolingForward(
           context_handle,
           pool_desc,
