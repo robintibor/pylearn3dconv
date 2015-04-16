@@ -75,7 +75,7 @@ def test_training():
     expect_results(inputs_shape, filters_shape, kernel_stride,
         CuDnnConv3dElemwise, expected_results)
     # Then with stride and real pooling
-    print("real pooling...should fail as its not implemented")
+    print("\nReal pooling...should fail as its not implemented")
     pool_type = 'max'
     pool_shape = [1,1,1]
     pool_stride = [1,1,1]
@@ -191,14 +191,19 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
                 algorithm.model.layers[0].__class__.__name__,
                 expected_results[setname], 
                 np.round(results[setname], decimals=2).tolist())"""
+    all_results_ok = True
     for setname in results:
-        assert np.allclose(results[setname], expected_results[setname]), \
+        if not np.allclose(results[setname], expected_results[setname]):
             ("Training mismatch,\n" + \
             "Expect {:s} for class {:s} to be:\n{:s},\nGot:\n{:s}").format(
                 setname,
                 algorithm.model.layers[0].__class__.__name__,
                 expected_results[setname], 
                 np.round(results[setname], decimals=2).tolist())
+            all_results_ok=False
+    if not all_results_ok: 
+        raise AssertionError("Training classification rates differed"
+         "from expectation")
 
 if __name__ == '__main__':
     test_training()

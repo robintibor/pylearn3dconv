@@ -3,29 +3,12 @@ import theano
 import theano.sandbox.cuda.dnn as cdnn
 import theano.misc.pycuda_init
 import numpy as np
-import theano_dnn_first_try.theano_dnn_conv as owndnn
 from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            host_from_gpu,
                                            gpu_contiguous, HostFromGpu,
                                            gpu_alloc_empty)
 
 from convolutions import vectorized_conv
-def test_one():
-    img = T.ftensor4()
-    kernel = T.ftensor4()
-    conv_result = cdnn.dnn_conv(img, kernel)
-    conv_func = theano.function([img, kernel], conv_result)
-    result= conv_func(np.random.normal(size=(3,4,5,6)).astype('float32'), 
-        np.random.normal(size=(2,4,3,5)).astype('float32'))
-    print np.array(result).shape
-
-def test_two():
-    img_shape = T.lvector()
-    kernel_shape = T.lvector()
-    a = owndnn.GpuDnnConv3dDesc('valid')
-    desc_result = a(img_shape, kernel_shape)
-    conv_desc_func = theano.function([img_shape, kernel_shape], desc_result)
-    desc = conv_desc_func([3,4],[2,2])
 
 def old_test_gradient():
     # get small input
@@ -79,19 +62,16 @@ from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
 from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
 from vol_conv.perf.perf_layers import create_fprop_layer_3d_symbolic
 from vol_conv.test_data import generate_test_data
-import theano.sandbox.cuda
 import theano
-import theano.sandbox.cuda.dnn as cdnn
 from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            host_from_gpu,
                                            gpu_contiguous, HostFromGpu,
                                            gpu_alloc_empty)
 from theano.sandbox.cuda.dnn import GpuDnnConv, GpuDnnConvDesc
 from numpy.random import RandomState
-from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
+from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnnPool3dDesc
 
 import numpy as np
-import theano_dnn_first_try.theano_dnn_conv as owndnn
 
 ftensor5 = T.TensorType('float32', (False,)*5)
 class FakeMLP():
@@ -173,6 +153,9 @@ def create_dnn_pool_func(pool_shape, pool_stride):
 from pylearn2.models.mlp import max_pool  
 from theano.sandbox.cuda.dnn import dnn_pool  
 rng = RandomState(np.uint32(hash('tobiderpuma')))
+
+pool_desc = GpuDnnPool3dDesc((3,3,4),(2,7,1), 'max', (0,0,0))()
+
 """    
 input_shape = [5,2,8,7] # bc01
 pool_shape = (3,4)
@@ -194,7 +177,6 @@ dnn_result = max_pool_dnn_func(inputs)
 numpy_result = max_pool_numpy(inputs, pool_shape, pool_stride)
 
 assert np.sum(np.square(dnn_result - numpy_result)) < 1e-4
- """
 
 input_shape = [5,2,8,7,6]#bc012
 pool_shape = (3,4,2)
@@ -207,3 +189,8 @@ dnn_3d_2d_result = max_pool_3d_2d(inputs, pool_shape, pool_stride)
 print "dnn"
 print dnn_3d_2d_result.shape
 assert np.sum(np.square(dnn_3d_2d_result - numpy_result)) < 1e-4
+
+
+ """
+ 
+ 

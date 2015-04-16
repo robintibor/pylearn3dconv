@@ -28,7 +28,6 @@ c_set_tensor5d(CudaNdarray *var, cudnnTensorDescriptor_t desc) {
       hostDims[i] = CudaNdarray_HOST_DIMS(var)[i];
     }
 
-    //return -1;
     cudnnStatus_t err = cudnnSetTensorNdDescriptor(
     desc, CUDNN_DATA_FLOAT,
     nbDims,

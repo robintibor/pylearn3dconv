@@ -2,7 +2,8 @@ from conv_3d import Conv3dElemwise
 import functools
 from pylearn2.linear.linear_transform import LinearTransform as P2LT
 from theano.sandbox.cuda.basic_ops import (gpu_contiguous, gpu_alloc_empty)
-from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
+#from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
+from vol_conv.theano_dnn_first_try.theano_dnn_conv import dnn_3dconv
 
 class CuDnn3dConv():
     op_axes = ('b', 'c', 0, 1, 2)
@@ -18,20 +19,8 @@ class CuDnn3dConv():
             # convert from input axes to op_axes
             reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
             x = x.dimshuffle(*reshuffle_arr)
-        x  = gpu_contiguous(x)
-        # TODO: check if necessary gpu_contigous of filters.. maybe remove if
-        # all tests work fine without 
-        filters = gpu_contiguous(self.filters)
-        desc = GpuDnnConv3dDesc(subsample=tuple(self.kernel_stride), 
-            conv_mode='cross')()
-        
-        desc_op = desc.owner.op
-        out_shp = GpuDnn3dConv.get_out_shape(x.shape, filters.shape,
-                                           desc_op.subsample)
-        
-        
-        out = gpu_alloc_empty(*out_shp)
-        rval = GpuDnn3dConv()(x, filters, out, desc)
+        rval = dnn_3dconv(x, self.filters, subsample=self.kernel_stride,
+            conv_mode='cross')
         rval = rval + self.bias.dimshuffle('x', 0, 'x', 'x', 'x')
 
         output_axes = self.output_axes
