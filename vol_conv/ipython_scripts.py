@@ -149,14 +149,10 @@ def max_pool_3d_2d(inputs, pool_shape, pool_stride):
     output_shape = [(inputs.shape[i + 2] - pool_shape[i]) // pool_stride[i] + 1 
         for i in xrange(len(pool_shape))]
     output_shape = list(inputs.shape[0:2]) + output_shape
-    #output = np.array()
     first_2d_pooled_output = np.ones(output_shape[0:4] + [inputs.shape[4]]).astype('float32')
     for z in range(inputs.shape[4]):
         pooled_slice = dnn_pool2d(inputs[:,:,:,:,z])
         first_2d_pooled_output[:,:,:,:,z] = pooled_slice
-        #output.append(pooled_slice)
-        #print z
-        #print np.array(pooled_slice).shape
     # now 1d-pool over last dimension...
     # coudl use first or second dimension as input fo pool1d..
     output = np.ones(output_shape).astype(np.float32) * np.nan
@@ -165,7 +161,6 @@ def max_pool_3d_2d(inputs, pool_shape, pool_stride):
     for y in range(first_2d_pooled_output.shape[3]):
         pooled_slice = dnn_pool1d(first_2d_pooled_output[:,:,:,y,:])
         output[:,:,:,y,:] = pooled_slice
-        
     return output
     
 def create_dnn_pool_func(pool_shape, pool_stride):
