@@ -2,6 +2,10 @@ import theano.tensor as T
 from theano.sandbox.cuda.dnn import dnn_pool
 
 def dnn_pool3d2d(inputs, pool_shape, pool_stride, image_shape, mode='max'):
+    print("inputs shape", inputs.shape)
+    print("pool_shape", pool_shape)
+    print("pool_stride", pool_stride)
+    print("image_shape", image_shape)
     first_2d_pooled_outputs = []
     for z in range(image_shape[2]):
         pooled_slice = dnn_pool(inputs[:,:,:,:,z], ws=pool_shape[0:2], 

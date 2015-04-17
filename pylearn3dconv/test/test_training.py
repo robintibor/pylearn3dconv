@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
 from pylearn3dconv.volumetric_space import Conv3DSpace
-from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
-from pylearn3dconv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
-from pylearn3dconv.layers.cublas_3d_conv import CuBlasConv3dElemwise
+from pylearn3dconv.layers.variants import (CuBlasConv3dElemwise,
+    CuDnnConv3dElemwise, Theano3d2dConv3dElemwise, Theano3dConv3dElemwise)
 import numpy as np
 from pylearn2.models.mlp import IdentityConvNonlinearity
 import theano
@@ -16,60 +14,73 @@ from numpy.random import RandomState
 from pylearn3dconv.test import generate_test_data
 
 def test_training():
+    #b 0 1 2 c format
     inputs_shape = [100,7,6,5,3]
     filters_shape = [11,4,3,2,3]
-    # First with no stride and no pooling
+    
+    # Then with stride and fake pooling expect same results as without pooling
+    print("Stride and fake pooling")
+    kernel_stride = (2, 1, 2)
+    pool_type = 'max'
+    pool_shape = (1,1,1)
+    pool_stride = (1,1,1)
+    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
+         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
+         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
+       }
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        Theano3dConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        CuBlasConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        CuDnnConv3dElemwise, expected_results)
     print("No stride no pooling")
     kernel_stride = [1, 1, 1]
     pool_type = None
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
+    pool_shape = (1,1,1)
+    pool_stride = (1,1,1)
     expected_results = {'train': [0.58, 0.88, 0.96, 0.98, 1.0],
          'valid': [0.72, 0.76, 0.92, 0.96, 1.0],
          'test': [0.56, 0.6, 0.8, 0.96, 0.96],
        }
     
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         Theano3dConv3dElemwise, expected_results)
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         CuBlasConv3dElemwise, expected_results)
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         CuDnnConv3dElemwise, expected_results)
 
     # Then with stride
     print("Stride and no pooling")
     kernel_stride = [2, 1, 2]
+    pool_type = None
+    pool_shape = (1,1,1)
+    pool_stride = (1,1,1)
     expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
          'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
          'test': [0.48, 0.68, 0.84, 0.84, 0.84],
        }
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         Theano3dConv3dElemwise, expected_results)
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         CuBlasConv3dElemwise, expected_results)
     expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuDnnConv3dElemwise, expected_results)
-    # Then with stride and fake pooling expect same results as without pooling
-    print("Stride and fake pooling")
-    pool_type = 'max'
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
-    kernel_stride = [2, 1, 2]
-    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
-         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
-         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
-       }
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        Theano3dConv3dElemwise, expected_results)
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        CuBlasConv3dElemwise, expected_results)
-    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         CuDnnConv3dElemwise, expected_results)
     # Then with stride and real pooling
     print("\nReal pooling...should fail as its not implemented")
     pool_type = 'max'
-    pool_shape = [1,1,1]
-    pool_stride = [1,1,1]
+    pool_shape = (2,2,2)
+    pool_stride = (1,1,1)
     kernel_stride = [2, 1, 2]
     expect_results(inputs_shape, filters_shape, kernel_stride,
         Theano3dConv3dElemwise,
@@ -91,22 +102,24 @@ def test_training():
        })
 
 
-def expect_results(inputs_shape, filters_shape, kernel_stride, conv_layer_class, 
-    expected_results):
+def expect_results(inputs_shape, filters_shape, kernel_stride, 
+        pool_type, pool_shape, pool_stride, conv_layer_class, expected_results):
     # a great seed is half the work :)
     rng = RandomState(hash('tobipuma') % 4294967295)
     inputs, filters, bias = generate_test_data(rng, inputs_shape, filters_shape)
     mlp_fprop, train_set, valid_set, test_set, algorithm = setup_training(
-        inputs, filters, bias, kernel_stride, conv_layer_class)
+        inputs, filters, bias, kernel_stride, pool_type, pool_shape, 
+        pool_stride, conv_layer_class)
     run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
         expected_results)
     print conv_layer_class.__name__ + " - Ok."
 
-def setup_training(inputs, filters, bias, kernel_stride, conv_layer_class):
+def setup_training(inputs, filters, bias, kernel_stride, pool_type,
+    pool_shape, pool_stride,conv_layer_class):
     """ Setup model, prediction function, algorithm for training"""
     train_set, valid_set, test_set = generate_datasets(inputs)
     mlp = construct_model(inputs.shape, filters, bias, kernel_stride, 
-        conv_layer_class)
+        pool_type, pool_shape, pool_stride, conv_layer_class)
     mlp_fprop = construct_predict_function(mlp)
     algorithm = create_algorithm(mlp, train_set)
     
@@ -127,13 +140,14 @@ def generate_datasets(inputs):
     return train_set, valid_set, test_set
 
 def construct_model(inputs_shape, filters, bias, kernel_stride,
-    conv_layer_class):
+    pool_type, pool_shape, pool_stride,  conv_layer_class):
     conv_3d_input_space = Conv3DSpace(inputs_shape[1:4], 
         num_channels=inputs_shape[4], axes=('b',0,1,2,'c'))
     conv_3d_layer = conv_layer_class(output_channels=filters.shape[0], 
         kernel_shape=filters.shape[1:4], kernel_stride = kernel_stride,
         layer_name='conv3d_lin', nonlinearity=IdentityConvNonlinearity(),
-        irange=0.001)
+        irange=0.001, pool_type=pool_type, pool_shape=pool_shape,
+        pool_stride=pool_stride)
     softmax_layer = Softmax(max_col_norm=2, layer_name='y',
         n_classes=2, istdev=.05)
     mlp = MLP(input_space=conv_3d_input_space, layers=[conv_3d_layer,
@@ -174,14 +188,14 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
             results[name].append(accuracy)
         algorithm.train(train_set)
    
-    """for debug, enable this...
+    #"""for debug, enable this...
     for setname in results:
         print("Training mismatch,\n" + \
             "Expect {:s} for class {:s} to be:\n{:s},\nGot:\n{:s}").format(
                 setname,
                 algorithm.model.layers[0].__class__.__name__,
                 expected_results[setname], 
-                np.round(results[setname], decimals=2).tolist())"""
+                np.round(results[setname], decimals=2).tolist())#"""
     all_results_ok = True
     for setname in results:
         if not np.allclose(results[setname], expected_results[setname]):

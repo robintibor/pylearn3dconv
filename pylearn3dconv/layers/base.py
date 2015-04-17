@@ -140,15 +140,19 @@ class Conv3dElemwise(Layer):
             if pool_type =='max':
                 pool_type = 'average'
             
+            assert self.conv_transformer.op_axes == self.detector_space.axes
+            dummy_detector = Conv3DSpace.convert(dummy_detector, 
+                self.conv_transformer.op_axes,
+                ('b','c', 0, 1, 2))
             dummy_p = dnn_pool3d2d(inputs=dummy_detector,
                                pool_shape=self.pool_shape,
                                pool_stride=self.pool_stride,
                                image_shape=self.detector_space.shape,
                                mode=pool_type)
             dummy_p = dummy_p.eval()
-            self.output_space = Conv3DSpace(shape=[dummy_p.shape[2],
-                                                   dummy_p.shape[3],
-                                                   dummy_p.shape[4]],
+            # output shape is on axes 2,3,4 now
+            output_shape = dummy_p.shape[2:]
+            self.output_space = Conv3DSpace(shape=output_shape,
                                             num_channels=self.output_channels,
                                             axes=self.conv_transformer.op_axes)
         else:
@@ -171,7 +175,7 @@ class Conv3dElemwise(Layer):
         rng = self.mlp.rng
         # output shape determined by input/kernel shapes and stride
         output_shape = [int((self.input_space.shape[i] - 
-                            self.kernel_shape[i]) / 
+                            self.kernel_shape[i]) //
                         self.kernel_stride[i]) + 1 
                         for i in xrange(3)]
 
@@ -297,8 +301,7 @@ class Conv3dElemwise(Layer):
             if ('b','c', 0, 1, 2) != self.conv_transformer.op_axes:
                 d = Conv3DSpace.convert(d, self.conv_transformer.op_axes,
                     ('b','c', 0, 1, 2))
-            
-                
+            print self.detector_space.shape
             p = dnn_pool3d2d(inputs=d,
                            pool_shape=self.pool_shape,
                            pool_stride=self.pool_stride,

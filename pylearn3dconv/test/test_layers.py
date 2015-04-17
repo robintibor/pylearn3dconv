@@ -148,7 +148,7 @@ def create_layer3d(inputs_shape, filters, bias, filters_stride,
     conv_3d_layer.set_weights(converted_filters)
     conv_3d_layer.set_biases(bias)
     return conv_3d_layer
- 
+
 def create_fprop_layer_3d(conv_3d_layer, inputs_3d_theano):
     conv3d_result = conv_3d_layer.fprop(inputs_3d_theano)
     # keep variable on gpu for perfing
