@@ -135,30 +135,23 @@ class Conv3dElemwise(Layer):
                 sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
             assert self.pool_type in ['max', 'mean']
             
-            # rename pool type for dnn ('mean' should be 'average')
-            pool_type = self.pool_type
-            if pool_type =='max':
-                pool_type = 'average'
-            
-            assert self.conv_transformer.op_axes == self.detector_space.axes
-            dummy_detector = Conv3DSpace.convert(dummy_detector, 
-                self.conv_transformer.op_axes,
-                ('b','c', 0, 1, 2))
-            dummy_p = dnn_pool3d2d(inputs=dummy_detector,
-                               pool_shape=self.pool_shape,
-                               pool_stride=self.pool_stride,
-                               image_shape=self.detector_space.shape,
-                               mode=pool_type)
+            dummy_p = self.pool_transformer.pool(dummy_detector)
+           
             dummy_p = dummy_p.eval()
-            # output shape is on axes 2,3,4 now
-            output_shape = dummy_p.shape[2:]
+            # determine where image axes are
+            image3d_axes_inds = [self.detector_space.axes.index(i) 
+                for i in (0,1,2)]
+            output_shape = [dummy_p.shape[i] for i in image3d_axes_inds]
             # TODELAY: this code would work without performing actual pooling at start:
             #image_shape=self.detector_space.shape
             #output_shape = [((image_shape[i] - self.pool_shape[i]) // 
             #    self.pool_stride[i]) + 1  for i in xrange(3)]
+            
+
+            # axes should not change by pooling...
             self.output_space = Conv3DSpace(shape=output_shape,
                                             num_channels=self.output_channels,
-                                            axes=self.conv_transformer.op_axes)
+                                            axes=self.detector_space.axes)
         else:
             # no pooling so set output space to detector space
             self.output_space = self.detector_space
@@ -188,6 +181,8 @@ class Conv3dElemwise(Layer):
                                           axes=self.conv_transformer.op_axes)
 
         self.initialize_transformer(rng)
+        if self.pool_type is not None:
+            self.initialize_pool_transformer()
 
         W, bias = self.transformer.get_params()
         W.name = self.layer_name + '_W'
@@ -196,6 +191,13 @@ class Conv3dElemwise(Layer):
         logger.info('Input shape: {0}'.format(self.input_space.shape))
         logger.info('Detector space: {0}'.format(self.detector_space.shape))
         self.initialize_output_space()
+
+    def initialize_pool_transformer(self):
+        image_shape = self.detector_space.shape
+        self.pool_transformer = self.pool_transformer(
+            pool_shape=self.pool_shape, pool_stride=self.pool_stride,
+            image_shape=image_shape, pool_type=self.pool_type, 
+            input_axes=self.detector_space.axes)
 
     @wraps(Layer.get_params)
     def get_params(self):
@@ -295,24 +297,7 @@ class Conv3dElemwise(Layer):
                 d = self.detector_normalization(d)
             assert self.pool_type in ['max', 'mean']
             
-            # rename pool type for dnn ('mean' should be 'average')
-            pool_type = self.pool_type
-            if pool_type =='max': 
-                pool_type = 'average'
-            
-            
-            # maybe have to shuffle for dnn pool 3d 2d
-            if ('b','c', 0, 1, 2) != self.conv_transformer.op_axes:
-                d = Conv3DSpace.convert(d, self.conv_transformer.op_axes,
-                    ('b','c', 0, 1, 2))
-            p = dnn_pool3d2d(inputs=d,
-                           pool_shape=self.pool_shape,
-                           pool_stride=self.pool_stride,
-                           image_shape=self.detector_space.shape,
-                           mode=pool_type)
-            if ('b','c', 0, 1, 2) != self.output_space.axes:
-                p = Conv3DSpace.convert(p, ('b','c', 0, 1, 2),
-                    self.output_space.axes)
+            p = self.pool_transformer.pool(d)
             
             self.output_space.validate(p)
         else:

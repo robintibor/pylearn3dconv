@@ -59,16 +59,16 @@ def test_training():
     }
     expect_results(inputs_shape, filters_shape, kernel_stride,
         pool_type, pool_shape, pool_stride, expected_results)
-    
+
     print("Real pooling")
     pool_type = 'max'
     pool_shape = (2,2,2)
     pool_stride = (1,1,1)
     kernel_stride = [2, 1, 2]
     expected_results = {
-        'train': [0.8, 0.98, 1.0, 1.0, 1.0],
-        'valid': [0.88, 0.96, 0.96, 0.96, 0.96],
-        'test': [0.8, 0.8, 0.92, 0.92, 0.92],
+        'train': [0.62, 0.84, 1.0, 1.0, 1.0],
+        'valid': [0.6, 0.88, 1.0, 1.0, 1.0],
+        'test': [0.52, 0.84, 1.0, 1.0, 1.0],
     }
     expect_results(inputs_shape, filters_shape, kernel_stride,
         pool_type, pool_shape, pool_stride,expected_results)
@@ -170,7 +170,7 @@ def run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
     all_results_ok = True
     for setname in results:
         if not np.allclose(results[setname], expected_results[setname]):
-            ("Training mismatch,\n" + \
+            print("Training mismatch,\n" + \
             "Expect {:s} for class {:s} to be:\n{:s},\nGot:\n{:s}").format(
                 setname,
                 algorithm.model.layers[0].__class__.__name__,
