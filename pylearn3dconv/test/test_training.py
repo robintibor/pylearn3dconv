@@ -1,14 +1,5 @@
 #!/usr/bin/env python
-# I don't know how to properly import python packages, so I do it like this ;)
-# http://stackoverflow.com/a/9806045/1469195
-import os
-import inspect
 from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentparentdir = os.path.dirname(os.path.dirname(currentdir))
-
-os.sys.path.insert(0,parentparentdir) 
-
 from pylearn3dconv.volumetric_space import Conv3DSpace
 from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
 from pylearn3dconv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
@@ -22,7 +13,7 @@ from pylearn2.training_algorithms.sgd import SGD
 from pylearn2.models.mlp import MLP, Softmax
 from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
-from test_data import generate_test_data
+from pylearn3dconv.test import generate_test_data
 
 def test_training():
     inputs_shape = [100,7,6,5,3]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from test_data import generate_test_data
+from pylearn3dconv.test import generate_test_data
 import numpy as np
 import theano.tensor as T
 from pylearn3dconv.theanodnn.conv import dnn_3dconv
