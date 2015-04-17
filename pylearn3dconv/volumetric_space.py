@@ -154,7 +154,7 @@ class Conv3DSpace(SimplyTypedSpace):
             if batch_size == 1:
                 n = 1
             else:
-                # TODO: try to extract constant scalar value from batch_size
+                # todo: try to extract constant scalar value from batch_size
                 n = 5
             rval.tag.test_value = self.get_origin_batch(batch_size=n,
                                                         dtype=dtype)

@@ -22,18 +22,9 @@ c_set_tensor5d(CudaNdarray *var, cudnnTensorDescriptor_t desc) {
       }
       dims_multiplied *= CudaNdarray_HOST_DIMS(var)[i];
     }
-    // TODO: copy necessary?
-    int hostDims[nbDims];
-    for (int i = 0; i < nbDims; i++) {
-      hostDims[i] = CudaNdarray_HOST_DIMS(var)[i];
-    }
 
     cudnnStatus_t err = cudnnSetTensorNdDescriptor(
-    desc, CUDNN_DATA_FLOAT,
-    nbDims,
-    hostDims,
-    hostStrides
-  );
+    desc, CUDNN_DATA_FLOAT, nbDims, CudaNdarray_HOST_DIMS(var), hostStrides);
 
   if (err != CUDNN_STATUS_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError,
@@ -71,15 +62,9 @@ c_set_filter5d(CudaNdarray *var, cudnnFilterDescriptor_t desc) {
     return -1;
   }
 
-  // TODO: copy necessary?
-  int hostDims[nbDims];
-  for (int i = 0; i < nbDims; i++) {
-    hostDims[i] = CudaNdarray_HOST_DIMS(var)[i];
-  }
-
   cudnnStatus_t err = cudnnSetFilterNdDescriptor(
-    desc, CUDNN_DATA_FLOAT, nbDims, hostDims
-    );
+    desc, CUDNN_DATA_FLOAT, nbDims, CudaNdarray_HOST_DIMS(var));
+
   if (err != CUDNN_STATUS_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError,
 		 "Could not set filter descriptor: %s."
