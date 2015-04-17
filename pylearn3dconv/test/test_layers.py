@@ -4,11 +4,8 @@ from pylearn2.models.mlp import IdentityConvNonlinearity
 import numpy as np
 from pylearn2.space import Conv2DSpace
 import theano.tensor as T
-from pylearn3dconv.layers.cublas_3d_conv import CuBlasConv3dElemwise
-from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
-from pylearn3dconv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
-from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
-#from pylearn3dconv.layers.cudnn_3d_conv import CuDnn
+from pylearn3dconv.layers.variants import (CuBlasConv3dElemwise,
+    CuDnnConv3dElemwise, Theano3d2dConv3dElemwise, Theano3dConv3dElemwise)
 from pylearn3dconv.volumetric_space import Conv3DSpace
 from numpy.random import RandomState
 from pylearn3dconv.test import test_function
@@ -19,47 +16,49 @@ def test_layers():
     inputs_shape = [3,3,4,5,3]
     filters_shape = [3,1,4,4,3]
     filters_stride = (1,1,1)
+    pool_shape = (1,1,1)
+    pool_stride =(1,1,1)
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "Default test")
+        pool_shape, pool_stride, "Default test")
 
     inputs_shape = [1,1,1,1,1]
     filters_shape = [1,1,1,1,1]
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "Input and filter dimensions 1")
+        pool_shape, pool_stride, "Input and filter dimensions 1")
     
     # This will lead to a failure for theano 2d3d for some reason
     # (for now we ignore this and remove theano2d3d for this test
     inputs_shape = [3,3,4,5,3]
     filters_shape = [3,3,4,5,3]
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "Filter dimension = Input dimension (ignoring theano 3d2d)")
+        pool_shape, pool_stride, "Filter dimension = Input dimension (ignoring theano 3d2d)")
     
     inputs_shape = [3,3,4,5,3]
     filters_shape = [3,2,2,2,3]
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "Filter dimension < all Input dimension")
+        pool_shape, pool_stride, "Filter dimension < all Input dimension")
     
     # Filter smaller for all dimensions
     inputs_shape = [3,3,4,5,1]
     filters_shape = [3,1,1,1,1]
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "Filter dimension 1 everywhere")
+        pool_shape, pool_stride, "Filter dimension 1 everywhere")
     
     # Filter smaller for all dimensions
     inputs_shape = [3,3,6,5,3]
     filters_shape = [3,1,2,3,3]
     filters_stride = (2,3,2)
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        "With stride")
+        pool_shape, pool_stride, "With stride")
 
 def test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        testname):
+        pool_shape, pool_stride, testname):
     sys.stdout.write("{:40s} ...".format(testname))
     # Get test data
     rng = RandomState(hash('tobipuma') % 4294967295)
     inputs, filters, bias = generate_test_data(rng, inputs_shape, filters_shape)   
     function_and_names_3d = create_3d_fprops(inputs.shape, filters, bias,
-        filters_stride)
+        filters_stride, pool_shape, pool_stride)
     # (We get different results from theano2d3d 
     # if input time dimension is same as filter time dimension)
     # We want to ignore this, so we take it out 
@@ -67,57 +66,59 @@ def test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
         function_and_names_3d = filter(lambda f: f['name'] != 'Theano 3d2d',
             function_and_names_3d)
     reference_result3d = compute_3d_reference_result(inputs, filters, bias,
-        filters_stride)
+        filters_stride, pool_shape, pool_stride)
     test_functions(function_and_names_3d, inputs, reference_result3d)
     sys.stdout.write(" Ok.\n")
 
-def compute_3d_reference_result(inputs, filters, bias, filters_stride):
+def compute_3d_reference_result(inputs, filters, bias, filters_stride,
+    pool_shape, pool_stride):
     """ Use cublas as reference."""
     conv3d, _ = create_fprop_layer3d_function(inputs.shape, filters, bias,
-        filters_stride, CuBlasConv3dElemwise)
+        filters_stride, pool_shape, pool_stride, CuBlasConv3dElemwise)
     return conv3d(inputs)
 
-def create_3d_fprops(inputs_shape, filters, bias, filters_stride):
+def create_3d_fprops(inputs_shape, filters, bias, filters_stride,
+    pool_shape, pool_stride):
     filters_flipped = filters[:,::-1,::-1,::-1,:]
     fprops = [] 
-    fprops.append(compute_3d_func_and_axes('Blas 3d', inputs_shape,
-        filters, bias, filters_stride, CuBlasConv3dElemwise))
-    fprops.append(compute_3d_func_and_axes('Cudnn 3d', inputs_shape,
-        filters, bias, filters_stride, CuDnnConv3dElemwise))
-    fprops.append(compute_3d_func_and_axes('Theano 3d', inputs_shape,
-        filters, bias, filters_stride, Theano3dConv3dElemwise))
-    fprops.append(compute_3d_func_and_axes('Theano 3d2d', inputs_shape,
-        filters_flipped, bias, filters_stride, Theano3d2dConv3dElemwise))
+    names_layers = [
+        ('Blas3d', CuBlasConv3dElemwise), 
+        ('Cudnn 3d', CuDnnConv3dElemwise),
+        ('Theano 3d', Theano3dConv3dElemwise),
+        ('Theano 3d2d', Theano3d2dConv3dElemwise)]
+    for name_layer in names_layers:
+        name = name_layer[0]
+        layer_class = name_layer[1]
+        # flip filters, only for theano3d2d as it computes convolution, 
+        # others compute cross correlation
+        if layer_class != Theano3d2dConv3dElemwise:
+            this_filters = filters
+        else:
+            this_filters = filters_flipped
+        fprops.append(compute_3d_func_and_axes(name, inputs_shape,
+            this_filters, bias, filters_stride, pool_shape, pool_stride,
+            layer_class))
     return fprops
 
 def compute_3d_func_and_axes(name, inputs_shape, filters, bias, filters_stride,
-    layer_class):
+    pool_shape, pool_stride, layer_class):
     function, layer = create_fprop_layer3d_function(inputs_shape, filters, 
-        bias, filters_stride, layer_class)
+        bias, filters_stride, pool_shape, pool_stride, layer_class)
     return({'name': name, 'function': function, 'axes': layer.output_space.axes})
 
 def create_fprop_layer3d_function(inputs_shape, filters, bias, filters_stride,
-    conv_layer_class):
+    pool_shape, pool_stride, conv_layer_class):
     ftensor5 = T.TensorType('float32', (False,)*5)
     inputs_3d_theano = ftensor5()
     conv_3d_layer = create_layer3d(inputs_shape, filters, bias, filters_stride,
-        conv_layer_class)
+        pool_shape, pool_stride, conv_layer_class)
     conv3d_result = create_fprop_layer_3d(conv_3d_layer, 
         inputs_3d_theano)
     conv3d = theano.function([inputs_3d_theano], conv3d_result)
     return conv3d, conv_3d_layer
 
-def create_fprop_layer_3d_symbolic(inputs_shape, filters,
-        bias, filters_stride, conv_layer_class, inputs_3d_theano):
-    """ Not used here, just for debugging """
-    conv_3d_layer = create_layer3d(inputs_shape, filters,
-        bias, filters_stride, conv_layer_class)
-    conv3d_result = create_fprop_layer_3d(conv_3d_layer, 
-        inputs_3d_theano)
-    return conv3d_result
-
 def create_layer3d(inputs_shape, filters, bias, filters_stride,
-    conv_layer_class):
+    pool_shape, pool_stride, conv_layer_class):
     # mlp variable needed for setting input space, rng is ignorable (filters 
     # bias are reset to given values at end of this function)
     mlp = FakeMLP(rng=np.random,batch_size=inputs_shape[0])

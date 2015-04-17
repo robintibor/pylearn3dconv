@@ -73,7 +73,8 @@ class Conv3dElemwise(Layer):
     
     """
 
-    conv_theano_op=None # should be overwritten by subclass
+    conv_transformer=None # should be overwritten by subclass
+    pool_transformer=None # should be overwritten by subclass
 
     def __init__(self,
                  output_channels,
@@ -106,7 +107,7 @@ class Conv3dElemwise(Layer):
             output_space=self.detector_space,
             kernel_shape=self.kernel_shape,
             kernel_stride=self.kernel_stride,
-            conv_op=self.conv_theano_op,
+            conv_op=self.conv_transformer,
             rng=rng)
 
     def initialize_output_space(self):
@@ -149,7 +150,7 @@ class Conv3dElemwise(Layer):
 
         self.detector_space = Conv3DSpace(shape=output_shape,
                                           num_channels=self.output_channels,
-                                          axes=self.conv_theano_op.op_axes)
+                                          axes=self.conv_transformer.op_axes)
 
         self.initialize_transformer(rng)
 
