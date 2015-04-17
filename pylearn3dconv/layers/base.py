@@ -6,6 +6,7 @@ from pylearn3dconv.volumetric_space import Conv3DSpace
 import numpy as np
 import theano.tensor as T
 from theano.compat import OrderedDict
+from pylearn3dconv.theanodnn.pool import dnn_pool3d2d
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,8 @@ class Conv3dElemwise(Layer):
                  layer_name,                 
                  nonlinearity,
                  irange,
-                 init_bias=0.):
+                 init_bias=0.,
+                 pool_type=None):
         super(Conv3dElemwise, self).__init__()
         assert nonlinearity is not None
 
@@ -116,16 +118,34 @@ class Conv3dElemwise(Layer):
         pooling operator and the hyperparameters of the convolutional layer
         into consideration as well.
         """
-        dummy_batch_size = self.mlp.batch_size
-
-        if dummy_batch_size is None:
-            dummy_batch_size = 2
-        #dummy_detector =\
-        #    sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
-
-        #dummy_detector = dummy_detector.eval()
+        if self.pool_type is not None:
+            dummy_batch_size = self.mlp.batch_size
+            if dummy_batch_size is None:
+                dummy_batch_size = 2
+            dummy_detector =\
+                sharedX(self.detector_space.get_origin_batch(dummy_batch_size))
+            assert self.pool_type in ['max', 'mean']
+            
+            # rename pool type for dnn ('mean' should be 'average')
+            pool_type = self.pool_type
+            if pool_type =='max': pool_type = 'average'
+            
+            dummy_p = dnn_pool3d2d(inputs=dummy_detector,
+                               pool_shape=self.pool_shape,
+                               pool_stride=self.pool_stride,
+                               image_shape=self.detector_space.shape,
+                               mode=pool_type)
+            dummy_p = dummy_p.eval()
+            self.output_space = Conv3DSpace(shape=[dummy_p.shape[2],
+                                                   dummy_p.shape[3],
+                                                   dummy_p.shape[4]],
+                                            num_channels=self.output_channels,
+                                            axes=('b', 'c', 0, 1, 2))
+        else:
+            # no pooling so set output space to detector space
+            self.output_space = self.detector_space
         
-        # no pooling so set output space to detector space shape
+        # TODOREMOVETHIS:
         self.output_space = self.detector_space
 
         logger.info('Output space: {0}'.format(self.output_space.shape))
