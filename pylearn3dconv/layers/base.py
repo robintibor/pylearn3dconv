@@ -305,7 +305,6 @@ class Conv3dElemwise(Layer):
             if ('b','c', 0, 1, 2) != self.conv_transformer.op_axes:
                 d = Conv3DSpace.convert(d, self.conv_transformer.op_axes,
                     ('b','c', 0, 1, 2))
-            print self.detector_space.shape
             p = dnn_pool3d2d(inputs=d,
                            pool_shape=self.pool_shape,
                            pool_stride=self.pool_stride,
