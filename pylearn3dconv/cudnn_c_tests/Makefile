@@ -17,6 +17,6 @@ compile: $(MAIN_BINARIES)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 clean:
-	rm *.o $(MAIN_BINARIES)
+	rm $(MAIN_BINARIES)
 	
 	
