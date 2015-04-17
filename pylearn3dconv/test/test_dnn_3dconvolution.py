@@ -2,7 +2,7 @@
 from test_data import generate_test_data
 import numpy as np
 import theano.tensor as T
-from pylearn3dconv.theanodnn3d.theano_dnn_conv import dnn_3dconv
+from pylearn3dconv.theanodnn.conv import dnn_3dconv
 from numpy.random import RandomState
 from pylearn3dconv.test import test_function
 import sys

@@ -1,12 +1,29 @@
 import numpy as np
+from numpy.random import RandomState
+
+def test_pooling():
+    input_shape = [3,4,5,6,7]
+    pool_shape = (4,5,6)
+    pool_stride = (1,1,1)
+    rng = RandomState(hash('tobipuma') % 4294967295)
+    
+    inputs = rng.normal(size=input_shape)
+    reference_result = max_pool_3d_numpy(inputs, pool_shape, pool_stride)
+    
+    
+    pass
+    # create inputs for pooling
+    # get result numpy and dnn, compare
+    
 
 
 def max_pool_3d_numpy(inputs, pool_shape, pool_stride):
-    assert (len(inputs.shape) == 5)
+    assert (len(inputs.shape) == 5) # for now restrict to 3d images
     assert(len(pool_shape) == 3)
     assert(len(pool_stride) == 3)
+
     # in b c 0 1 2 format
-    output_shape = [((inputs.shape[i+2] - pool_shape[i]) // pool_stride[i]) + 1 
+    output_shape = [(inputs.shape[i + 2] - pool_shape[i]) // pool_stride[i] + 1 
         for i in xrange(len(pool_shape))]
     output_shape = list(inputs.shape[0:2]) + output_shape
     output = np.ones(output_shape) * np.nan
@@ -27,6 +44,4 @@ def max_pool_3d_numpy(inputs, pool_shape, pool_stride):
 
 
 if __name__ == "__main__":
-    pass
-    # create inputs for pooling
-    # get result numpy and dnn, compare
+    test_pooling()
