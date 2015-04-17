@@ -13,15 +13,6 @@ import sys
 
 def test_layers():
     """ Test layer fprops for different parameter combinations"""
-    inputs_shape = [3,3,6,5,3]
-    filters_shape = [3,1,2,3,3]
-    filters_stride = (2,3,2)
-    pool_shape=(2,2,2)
-    pool_stride=(1,1,1)
-    pool_type = 'max'
-    test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        pool_type, pool_shape, pool_stride, "With pooling")
-
     inputs_shape = [3,3,4,5,3]
     filters_shape = [3,1,4,4,3]
     filters_stride = (1,1,1)
@@ -58,6 +49,15 @@ def test_layers():
     filters_stride = (2,3,2)
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
         pool_type, pool_shape, pool_stride, "With stride")
+
+    inputs_shape = [3,3,6,5,3]
+    filters_shape = [3,1,2,3,3]
+    filters_stride = (2,3,2)
+    pool_shape=(2,2,2)
+    pool_stride=(1,1,1)
+    pool_type = 'max'
+    test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
+        pool_type, pool_shape, pool_stride, "With pooling")
     
 
 

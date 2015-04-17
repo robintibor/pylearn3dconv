@@ -90,6 +90,13 @@ class Conv3dElemwise(Layer):
                  pool_stride=None):
         super(Conv3dElemwise, self).__init__()
         assert nonlinearity is not None
+        if pool_type is not None:
+            assert pool_shape is not None, (
+                "You should specify the shape of "
+                "the spatial %s-pooling." % pool_type)
+            assert pool_stride is not None, (
+                "You should specify the strides of "
+                "the spatial %s-pooling." % pool_type)
 
         self.nonlin = nonlinearity
         self.__dict__.update(locals())
@@ -130,7 +137,8 @@ class Conv3dElemwise(Layer):
             
             # rename pool type for dnn ('mean' should be 'average')
             pool_type = self.pool_type
-            if pool_type =='max': pool_type = 'average'
+            if pool_type =='max':
+                pool_type = 'average'
             
             dummy_p = dnn_pool3d2d(inputs=dummy_detector,
                                pool_shape=self.pool_shape,
@@ -262,17 +270,52 @@ class Conv3dElemwise(Layer):
     @wraps(Layer.fprop)
     def fprop(self, state_below):
         self.input_space.validate(state_below)
+        
         z = self.transformer.lmul(state_below) # will already apply bias
+        
         d = self.nonlin.apply(z)
 
         if self.layer_name is not None:
             d.name = self.layer_name + '_z'
             self.detector_space.validate(d)
+        
+        if self.pool_type is not None:
+            if not hasattr(self, 'detector_normalization'):
+                self.detector_normalization = None
+
+            if self.detector_normalization:
+                d = self.detector_normalization(d)
+            assert self.pool_type in ['max', 'mean']
+            
+            # rename pool type for dnn ('mean' should be 'average')
+            pool_type = self.pool_type
+            if pool_type =='max': 
+                pool_type = 'average'
+            
+            
+            # maybe have to shuffle for dnn pool 3d 2d
+            if ('b','c', 0, 1, 2) != self.conv_transformer.op_axes:
+                d = Conv3DSpace.convert(d, self.conv_transformer.op_axes,
+                    ('b','c', 0, 1, 2))
+            
+                
+            p = dnn_pool3d2d(inputs=d,
+                           pool_shape=self.pool_shape,
+                           pool_stride=self.pool_stride,
+                           image_shape=self.detector_space.shape,
+                           mode=pool_type)
+            if ('b','c', 0, 1, 2) != self.output_space.axes:
+                p = Conv3DSpace.convert(p, ('b','c', 0, 1, 2),
+                    self.output_space.axes)
+            
+            self.output_space.validate(p)
+        else:
+            p = d
 
         if not hasattr(self, 'output_normalization'):
             self.output_normalization = None
 
         if self.output_normalization:
-            d = self.output_normalization(d)
+            p = self.output_normalization(p)
 
-        return d
+        return p
