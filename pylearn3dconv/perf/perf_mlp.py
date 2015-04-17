@@ -21,7 +21,6 @@ def perf_mlp():
     mlp_grad_func = create_mlp_grad_func(inputs_shape, filters_shape)
     mlp_grad_func(inputs)
     perf_func_print_results("Gradient Single layer", mlp_grad_func, None, inputs)
-    
 
 def create_mlp_grad_func(inputs_shape, filters_shape):
     inputs = ftensor5()
@@ -32,7 +31,6 @@ def create_mlp_grad_func(inputs_shape, filters_shape):
     grad = gpu_contiguous(grad)
     grad_func = theano.function([inputs], grad)
     return grad_func
-    
 
 def construct_model(inputs_shape, filters_shape):
     conv_3d_input_space = Conv3DSpace(inputs_shape[1:4], 
@@ -42,9 +40,14 @@ def construct_model(inputs_shape, filters_shape):
         layer_name='conv3d_lin', nonlinearity=IdentityConvNonlinearity(),
         irange=0.001, pool_type=None, pool_shape=None,
         pool_stride=None)
+    conv_3d_layer_2 = CuDnnConv3dElemwise(output_channels=filters_shape[0], 
+        kernel_shape=filters_shape[1:4], kernel_stride = (1,1,1),
+        layer_name='conv3d_lin2', nonlinearity=IdentityConvNonlinearity(),
+        irange=0.001, pool_type='max', pool_shape=(2,2,2),
+        pool_stride=(2,2,2))
     softmax_layer = Softmax(max_col_norm=2, layer_name='y',
         n_classes=2, istdev=.05)
-    mlp = MLP(input_space=conv_3d_input_space, layers=[conv_3d_layer])
+    mlp = MLP(input_space=conv_3d_input_space, layers=[conv_3d_layer, conv_3d_layer_2])
     return mlp
 
 

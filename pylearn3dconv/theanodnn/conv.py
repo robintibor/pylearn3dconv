@@ -108,7 +108,7 @@ class GpuDnnConv3dDesc(GpuOp):
         filter_stride = str(tuple(self.subsample)).strip('()'))
     
     def c_code_cache_version(self):
-        return (1, version())
+        return (2, version())
 
 
 
@@ -390,3 +390,70 @@ def dnn_3dconv(img, kerns,  subsample=(1, 1),
         
     out = gpu_alloc_empty(*out_shp)
     return GpuDnn3dConv()(img, kerns, out, desc)
+
+
+
+@local_optimizer([GpuDnn3dConv], inplace=True)
+def local_dnn3d_conv_inplace(node):
+    if type(node.op) != GpuDnn3dConv or node.op.inplace:
+        return
+    return [GpuDnn3dConv(inplace=True)(*node.inputs)]
+
+@local_optimizer([GpuDnn3dConvGradW], inplace=True)
+def local_dnn3d_convgw_inplace(node):
+    if type(node.op) != GpuDnn3dConvGradW or node.op.inplace:
+        return
+    return [GpuDnn3dConvGradW(inplace=True)(*node.inputs)]
+
+@local_optimizer([GpuDnn3dConvGradI], inplace=True)
+def local_dnn3d_convgi_inplace(node):
+    if type(node.op) != GpuDnn3dConvGradI or node.op.inplace:
+        return
+    return [GpuDnn3dConvGradI(inplace=True)(*node.inputs)]
+
+optdb.register('local_dnn3d_conv_inplace',
+               tensor.opt.in2out(local_dnn3d_conv_inplace,
+                                 local_dnn3d_convgw_inplace,
+                                 local_dnn3d_convgi_inplace,
+                                 name="local_dnn3d_conv_inplace"),
+               70.0, 'fast_run', 'inplace', 'gpu', 'cudnn')
+
+@register_opt('cudnn')
+@alpha_merge(GpuDnn3dConv, alpha_in=4, beta_in=5, nd=5)
+def local_dnn3d_conv_alpha_merge(node, *inputs):
+    if not dnn_available() or version() == -1:
+        return None
+    return [GpuDnn3dConv()(*inputs)]
+
+@register_opt('cudnn')
+@alpha_merge(GpuDnn3dConvGradW, alpha_in=4, beta_in=5, nd=5)
+def local_dnn3d_convw_alpha_merge(node, *inputs):
+    if not dnn_available() or version() == -1:
+        return None
+    return [GpuDnn3dConvGradW()(*inputs)]
+
+@register_opt('cudnn')
+@alpha_merge(GpuDnn3dConvGradI, alpha_in=4, beta_in=5, nd=5)
+def local_dnn3d_convi_alpha_merge(node, *inputs):
+    if not dnn_available() or version() == -1:
+        return None
+    return [GpuDnn3dConvGradI()(*inputs)]
+
+@register_opt('cudnn')
+@output_merge(GpuDnn3dConv, alpha_in=4, beta_in=5, out_in=2, nd=5)
+def local_dnn3d_conv_output_merge(node, *inputs):
+    inputs = inputs[0:2] + (gpu_contiguous(inputs[2]),) + inputs[3:]
+    return [GpuDnn3dConv()(*inputs)]
+
+@register_opt('cudnn')
+@output_merge(GpuDnn3dConvGradW, alpha_in=4, beta_in=5, out_in=2, nd=5)
+def local_dnn3d_convw_output_merge(node, *inputs):
+    inputs = inputs[0:2] + (gpu_contiguous(inputs[2]),) + inputs[3:]
+    return [GpuDnn3dConvGradW()(*inputs)]
+
+@register_opt('cudnn')
+@output_merge(GpuDnn3dConvGradI, alpha_in=4, beta_in=5, out_in=2, nd=5)
+def local_dnn3d_convi_output_merge(node, *inputs):
+    inputs = inputs[0:2] + (gpu_contiguous(inputs[2]),) + inputs[3:]
+    return [GpuDnn3dConvGradI()(*inputs)]
+
