@@ -122,25 +122,47 @@ int main(int argc, char** argv) {
 
   cudaMemcpy(filterData, filterHost, filterTotalDimension*sizeof(float),
       cudaMemcpyHostToDevice);
-  struct timeval tval_before, tval_after, tval_result;
-  gettimeofday(&tval_before, NULL);
-  cudaMemcpy(srcData, inputHost, inputTotalDimension*sizeof(float),
-      cudaMemcpyHostToDevice);
-  delete filterHost;
-  delete inputHost;
-  float alpha = 1;
-  float beta = 0;
+  struct timeval tval_before_copy, tval_before_conv, tval_after, tval_result;
+  int iterations = 25;
+  gettimeofday(&tval_before_copy, NULL);
+  for (int iter = 0; iter < iterations; ++iter) {
+    cudaMemcpy(srcData, inputHost, inputTotalDimension*sizeof(float),
+        cudaMemcpyHostToDevice);
+    float alpha = 1;
+    float beta = 0;
 
-  checkCudnnErrors(cudnnConvolutionForward(context_handle, &alpha, input_desc,
-      srcData, filter_desc, filterData, convDesc,
-      CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, NULL, 0, &beta, output_desc,
-      dstData));
+    checkCudnnErrors(cudnnConvolutionForward(context_handle, &alpha, input_desc,
+        srcData, filter_desc, filterData, convDesc,
+        CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, NULL, 0, &beta, output_desc,
+        dstData));
+    checkCudaErrors(cudaDeviceSynchronize());
 
+  }
   gettimeofday(&tval_after, NULL);
-  timersub(&tval_after, &tval_before, &tval_result);
-  double timeDiffInMs = (tval_result.tv_sec * 1000) +
+  timersub(&tval_after, &tval_before_copy, &tval_result);
+  double timeDiffTotal = (tval_result.tv_sec * 1000) +
       (tval_result.tv_usec / 1000.0);
-  printf("Time elapsed %5.2f ms\n", timeDiffInMs);
+  printf("Time elapsed (copy + conv): %5.2f ms\n", timeDiffTotal / iterations);
+
+
+  gettimeofday(&tval_before_conv, NULL);
+  for (int iter = 0; iter < iterations; ++iter) {
+    float alpha = 1;
+    float beta = 0;
+
+    checkCudnnErrors(cudnnConvolutionForward(context_handle, &alpha, input_desc,
+        srcData, filter_desc, filterData, convDesc,
+        CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, NULL, 0, &beta, output_desc,
+        dstData));
+    checkCudaErrors(cudaDeviceSynchronize());
+  }
+  gettimeofday(&tval_after, NULL);
+  timersub(&tval_after, &tval_before_conv, &tval_result);
+  double timeDiffConv = (tval_result.tv_sec * 1000) +
+        (tval_result.tv_usec / 1000.0);
+  double timeDiffCopy = timeDiffTotal - timeDiffConv;
+  printf("Time elapsed (copy): %5.2f ms\n", timeDiffCopy / iterations);
+  printf("Time elapsed (conv): %5.2f ms\n", timeDiffConv / iterations);
   float* result = new float[outputTotalDimension];
 
 
@@ -148,24 +170,13 @@ int main(int argc, char** argv) {
       outputTotalDimension*sizeof(float), cudaMemcpyDeviceToHost));
 
   // prevent that computation is compiled away by optimization
+
   double checkSumForPerf = 0;
   for (int i = 0; i < outputTotalDimension; ++i) {
     checkSumForPerf += result[i];
   }
   printf("random checksum %f\n", checkSumForPerf);
   delete result;
+  delete filterHost;
+  delete inputHost;
 }
-// TODELAY: delete this?
-// check for output dim
-/*
-int tensorOutputDimA[5];
-
-err = cudnnGetConvolutionNdForwardOutputDim(convDesc, input_desc, filter_desc,
-    nbDims, tensorOutputDimA);
-printf("Output: ");
-int i;
-for (i = 0; i < 5; ++i) {
-  printf("%d ", tensorOutputDimA[i]);
-}
-printf("\n");
-printf("success getting output dim: %d\n", CUDNN_STATUS_SUCCESS == err);*/
