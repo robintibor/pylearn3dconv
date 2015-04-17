@@ -159,6 +159,7 @@ def create_layer3d(inputs_shape, filters, bias, filters_stride,
     return conv_3d_layer
 
 def create_fprop_layer_3d(conv_3d_layer, inputs_3d_theano):
+    # TODELAY: remove this function if perfing uses own function
     conv3d_result = conv_3d_layer.fprop(inputs_3d_theano)
     # keep variable on gpu for perfing
     # Lets remove for now, we will perf differently anyways most likely

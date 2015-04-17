@@ -30,7 +30,8 @@ def perf_func(func, correct_result, *func_args):
     runs = 0
     result = None
     while ((total_running_time < 1 and runs < 100) or 
-        (total_running_time < 2 and runs < 30)):
+        (total_running_time < 2 and runs < 30) or
+        (total_running_time < 5 and runs < 20)):
         del result
         gc.collect()#make sure memory is empty
         #print("memory before real call:   {:5.1f} MB".format( 
