@@ -85,7 +85,9 @@ class Conv3dElemwise(Layer):
                  nonlinearity,
                  irange,
                  init_bias=0.,
-                 pool_type=None):
+                 pool_type=None,
+                 pool_shape=None,
+                 pool_stride=None):
         super(Conv3dElemwise, self).__init__()
         assert nonlinearity is not None
 
@@ -140,14 +142,11 @@ class Conv3dElemwise(Layer):
                                                    dummy_p.shape[3],
                                                    dummy_p.shape[4]],
                                             num_channels=self.output_channels,
-                                            axes=('b', 'c', 0, 1, 2))
+                                            axes=self.conv_transformer.op_axes)
         else:
             # no pooling so set output space to detector space
             self.output_space = self.detector_space
         
-        # TODOREMOVETHIS:
-        self.output_space = self.detector_space
-
         logger.info('Output space: {0}'.format(self.output_space.shape))
 
     @wraps(Layer.set_input_space)

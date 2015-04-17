@@ -13,6 +13,15 @@ import sys
 
 def test_layers():
     """ Test layer fprops for different parameter combinations"""
+    inputs_shape = [3,3,6,5,3]
+    filters_shape = [3,1,2,3,3]
+    filters_stride = (2,3,2)
+    pool_shape=(2,2,2)
+    pool_stride=(1,1,1)
+    pool_type = 'max'
+    test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
+        pool_type, pool_shape, pool_stride, "With pooling")
+
     inputs_shape = [3,3,4,5,3]
     filters_shape = [3,1,4,4,3]
     filters_stride = (1,1,1)
@@ -50,14 +59,6 @@ def test_layers():
     test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
         pool_type, pool_shape, pool_stride, "With stride")
     
-    inputs_shape = [3,3,6,5,3]
-    filters_shape = [3,1,2,3,3]
-    filters_stride = (2,3,2)
-    pool_shape=(2,2,2)
-    pool_stride=(1,1,1)
-    pool_type = 'max'
-    test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
-        pool_type, pool_shape, pool_stride, "With pooling")
 
 
 def test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
@@ -76,6 +77,7 @@ def test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
             function_and_names_3d)
     reference_result3d = compute_3d_reference_result(inputs, filters, bias,
         filters_stride, pool_type, pool_shape, pool_stride)
+    print reference_result3d.shape
     test_functions(function_and_names_3d, inputs, reference_result3d)
     sys.stdout.write(" Ok.\n")
 
