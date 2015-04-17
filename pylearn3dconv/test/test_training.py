@@ -60,7 +60,7 @@ def test_training():
     expect_results(inputs_shape, filters_shape, kernel_stride,
         pool_type, pool_shape, pool_stride, expected_results)
     
-    print("\nReal pooling...should fail as its not implemented")
+    print("Real pooling")
     pool_type = 'max'
     pool_shape = (2,2,2)
     pool_stride = (1,1,1)

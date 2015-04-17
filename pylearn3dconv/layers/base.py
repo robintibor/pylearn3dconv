@@ -152,7 +152,7 @@ class Conv3dElemwise(Layer):
             dummy_p = dummy_p.eval()
             # output shape is on axes 2,3,4 now
             output_shape = dummy_p.shape[2:]
-            # TODO: this code would work without performing actual pooling at start:
+            # TODELAY: this code would work without performing actual pooling at start:
             #image_shape=self.detector_space.shape
             #output_shape = [((image_shape[i] - self.pool_shape[i]) // 
             #    self.pool_stride[i]) + 1  for i in xrange(3)]

@@ -41,8 +41,11 @@ class Conv3dTransformer():
     @functools.wraps(P2LT.get_params)
     def get_params(self):
         """
-        .. todo::
-            WRITEME
+        Returns filters and biases.
+        Returns
+        -------
+        filters : theano shared variable
+        bias : theano shared variable
         """
         return [self.filters, self.bias]
 

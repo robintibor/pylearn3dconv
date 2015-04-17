@@ -39,9 +39,6 @@ class GpuDnnConv3dDesc(GpuOp):
     
     def c_headers(self):
         return ['cudnn.h']
-    """
-    def c_header_dirs(self):
-        return [os.path.dirname(__file__)]"""
 
     def c_libraries(self):
         return ['cudnn']
@@ -50,7 +47,7 @@ class GpuDnnConv3dDesc(GpuOp):
         return NVCC_compiler
 
     def __init__(self, subsample=(1, 1, 1), conv_mode='conv'):
-        # TODO: padding
+        #TODELAY: padding
         assert len(subsample) == 3
         self.subsample = subsample
         assert conv_mode in ('conv', 'cross')
@@ -62,10 +59,9 @@ class GpuDnnConv3dDesc(GpuOp):
 
     def c_code(self, node, name, inputs, outputs, sub):
         desc, = outputs
-        #TODOndim: make settable?
-        num_dims = 5 #for now keep fixed
+        num_dims = 5
         
-        # TODO pad arr/bordermode
+        # TODELAY pad arr/bordermode
         if self.conv_mode == 'conv':
             conv_flag = 'CUDNN_CONVOLUTION'
         else:
@@ -76,7 +72,7 @@ class GpuDnnConv3dDesc(GpuOp):
   cudnnStatus_t err;
   int convDims = 3;
   int padA[3] = {0,0,0}; // TODELAY: no padding for now, could reenable that
-  int filterStride[3] = {%(filter_stride)s}; // TODO: take real stride
+  int filterStride[3] = {%(filter_stride)s};
   int upscaleA[3]  = { 1,1,1 }; // don't upscale
 
   if ((err = cudnnCreateConvolutionDescriptor(&%(desc)s)) != CUDNN_STATUS_SUCCESS) {
@@ -84,7 +80,7 @@ class GpuDnnConv3dDesc(GpuOp):
                  "descriptor: %%s", cudnnGetErrorString(err));
     %(fail)s
   }
-  // TODO: just remove if else, check cudnn version somewhere else
+  // TODELAY: just remove if else, check cudnn version somewhere else
 #if defined(CUDNN_VERSION) && CUDNN_VERSION >= 20
   err = cudnnSetConvolutionNdDescriptor(
   %(desc)s,
@@ -110,17 +106,9 @@ class GpuDnnConv3dDesc(GpuOp):
         conv_flag=conv_flag, fail=sub['fail'],
         # transform subsample tuple to x,y,z string like 1,1,1
         filter_stride = str(tuple(self.subsample)).strip('()'))
-
-    def do_constant_folding(self, node):
-        
-        # Todo check if this is from original, if not remove it again
-        # Needed as we do not want to cache this information.
-        return False
     
     def c_code_cache_version(self):
-        # TODO: set true again
-        return None # to prevent cache leak warnings
-        #return (2, version())
+        return (1, version())
 
 
 
@@ -135,7 +123,7 @@ class GpuDnn3dConv(DnnBase, COp):
     __props__ = ()
 
     def __init__(self,  inplace=False):
-        # TODO: reenable inplace optimizations http://deeplearning.net/software/theano/extending/inplace.html
+        # TODELAY: reenable inplace optimizations http://deeplearning.net/software/theano/extending/inplace.html
         theano_cuda_dir = os.path.dirname(theano.sandbox.cuda.__file__)
         theano_files = ["dnn_base.c",
             os.path.join(theano_cuda_dir,"dnn_conv_base.c"),
@@ -231,18 +219,6 @@ class GpuDnn3dConv(DnnBase, COp):
     def infer_shape(self, node, shape):
         return [shape[2]]
 
-    # TODO: reenable constant folding
-    def do_constant_folding(self, node):
-        # Needed as we do not want to cache this information.
-        return False
-    
-    # TODO: reenable caching
-    def c_code_cache_version(self):
-        # TODO: set true again
-        from time import time
-        return int(time() * 100)# always recompile
-        #return (2, version())
-
 class GpuDnn3dConvGradW(DnnBase, COp):
     """
     The convolution gradient with respect to the weights.
@@ -317,20 +293,6 @@ class GpuDnn3dConvGradW(DnnBase, COp):
     def infer_shape(self, node, shape):
         return [shape[2]]
 
-
-    # TODO: reenable constant folding
-    def do_constant_folding(self, node):
-        # Needed as we do not want to cache this information.
-        return False
-    
-    # TODO: reenable caching
-    def c_code_cache_version(self):
-        # TODO: set true again
-        from time import time
-        return int(time() * 100)# always recompile
-        #return (2, version())
-
-
 class GpuDnn3dConvGradI(DnnBase, COp):
     """
     The convolution gradient with respect to the inputs.
@@ -398,18 +360,6 @@ class GpuDnn3dConvGradI(DnnBase, COp):
 
     def infer_shape(self, node, shape):
         return [shape[2]]
-
-    # TODO: reenable constant folding
-    def do_constant_folding(self, node):
-        # Needed as we do not want to cache this information.
-        return False
-    
-    # TODO: reenable caching
-    def c_code_cache_version(self):
-        # TODO: set true again
-        from time import time
-        return int(time() * 100)# always recompile
-        #return (2, version())
 
 
 def dnn_3dconv(img, kerns,  subsample=(1, 1),

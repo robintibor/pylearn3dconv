@@ -87,7 +87,6 @@ def test_layers_for_parameters(inputs_shape, filters_shape, filters_stride,
             function_and_names_3d)
     reference_result3d = compute_3d_reference_result(inputs, filters, bias,
         filters_stride, pool_type, pool_shape, pool_stride)
-    print reference_result3d.shape
     test_functions(function_and_names_3d, inputs, reference_result3d)
     sys.stdout.write(" Ok.\n")
 
