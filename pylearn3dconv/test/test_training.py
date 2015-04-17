@@ -17,26 +17,7 @@ def test_training():
     #b 0 1 2 c format
     inputs_shape = [100,7,6,5,3]
     filters_shape = [11,4,3,2,3]
-    
-    # Then with stride and fake pooling expect same results as without pooling
-    print("Stride and fake pooling")
-    kernel_stride = (2, 1, 2)
-    pool_type = 'max'
-    pool_shape = (1,1,1)
-    pool_stride = (1,1,1)
-    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
-         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
-         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
-       }
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        pool_type, pool_shape, pool_stride,
-        Theano3dConv3dElemwise, expected_results)
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        pool_type, pool_shape, pool_stride,
-        CuBlasConv3dElemwise, expected_results)
-    expect_results(inputs_shape, filters_shape, kernel_stride,
-        pool_type, pool_shape, pool_stride,
-        CuDnnConv3dElemwise, expected_results)
+
     print("No stride no pooling")
     kernel_stride = [1, 1, 1]
     pool_type = None
@@ -76,25 +57,48 @@ def test_training():
     expect_results(inputs_shape, filters_shape, kernel_stride,
         pool_type, pool_shape, pool_stride,
         CuDnnConv3dElemwise, expected_results)
-    # Then with stride and real pooling
+    
+    # With stride and fake pooling expect same results as without pooling
+    print("Stride and fake pooling")
+    kernel_stride = (2, 1, 2)
+    pool_type = 'max'
+    pool_shape = (1,1,1)
+    pool_stride = (1,1,1)
+    expected_results = {'train': [0.52, 0.92, 0.98, 1.0, 1.0],
+         'valid': [0.6, 0.8, 0.84, 0.8, 0.84],
+         'test': [0.48, 0.68, 0.84, 0.84, 0.84],
+       }
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        Theano3dConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        CuBlasConv3dElemwise, expected_results)
+    expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
+        CuDnnConv3dElemwise, expected_results)
+    
     print("\nReal pooling...should fail as its not implemented")
     pool_type = 'max'
     pool_shape = (2,2,2)
     pool_stride = (1,1,1)
     kernel_stride = [2, 1, 2]
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         Theano3dConv3dElemwise,
         {'train': [0.62, 1.0, 1.0, 1.0, 1.0],
          'valid': [0.56, 0.92, 1.0, 1.0, 1.0],
          'test': [0.56, 0.88, 0.96, 1.0, 1.0],
        })
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         Theano3d2dConv3dElemwise,
         {'train': [0.6, 1.0, 1.0, 1.0, 1.0],
          'valid': [0.68, 0.92, 0.96, 1.0, 1.0],
          'test': [0.56, 0.84, 0.92, 1.0, 1.0],
        })
     expect_results(inputs_shape, filters_shape, kernel_stride,
+        pool_type, pool_shape, pool_stride,
         CuBlasConv3dElemwise,
         {'train': [0.66, 1.0, 1.0, 1.0, 1.0],
          'valid': [0.68, 0.88, 0.96, 1.0, 1.0],
