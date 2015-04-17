@@ -45,23 +45,23 @@ def old_test_gradient():
     assert np.sum(np.square(cudnn_result- correct_result)) < 1e-4
     print "assertion passed results same"
 
-from vol_conv.volumetric_space import Conv3DSpace
-from vol_conv.layers.theano_3d_conv import Theano3dConv3dElemwise
+from pylearn3dconv.volumetric_space import Conv3DSpace
+from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
 import numpy as np
 from pylearn2.models.mlp import IdentityConvNonlinearity
 import theano
 import theano.tensor as T
-from vol_conv.volumetric_dense_design_matrix import VolumetricDenseDesignMatrix
+from pylearn3dconv.volumetric_dense_design_matrix import VolumetricDenseDesignMatrix
 from pylearn2.training_algorithms.sgd import SGD
 from pylearn2.models.mlp import MLP, Softmax, ConvElemwise
 from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
 from pylearn2.space import Conv2DSpace
-from vol_conv.layers.blas2d_manuel_conv import ConvElemwiseBlas
-from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
-from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
-from vol_conv.perf.perf_layers import create_fprop_layer_3d_symbolic
-from vol_conv.test_data import generate_test_data
+from pylearn3dconv.layers.blas2d_manuel_conv import ConvElemwiseBlas
+from pylearn3dconv.layers.cublas_3d_conv import CuBlasConv3dElemwise
+from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
+from pylearn3dconv.perf.perf_layers import create_fprop_layer_3d_symbolic
+from pylearn3dconv.test_data import generate_test_data
 import theano
 from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            host_from_gpu,
@@ -70,7 +70,7 @@ from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            gpu_from_host)
 from theano.sandbox.cuda.dnn import GpuDnnConv, GpuDnnConvDesc
 from numpy.random import RandomState
-from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnnPool3dDesc
+from pylearn3dconv.theano_dnn_first_try.theano_dnn_conv import GpuDnnPool3dDesc
 
 import numpy as np
 
@@ -231,8 +231,7 @@ dnn_3d_result = dnn_3d_func(inputs)
 print("dnn 3d shape")
 print dnn_3d_result.shape
 assert np.sum(np.square(dnn_3d_2d_result - numpy_result)) < 1e-4
-assert np.sum(np.square(dnn_3d_2d_result - dnn_3d_result)) < 1e-4
-
+assert np.sum(np.square(dnn_3d_2d_result - numpy_result)) < 1e-4
 
 ## Gradient possible??
 input_dnn = ftensor5()
@@ -245,6 +244,6 @@ gradient_result = gradfunc(inputs)
 print gradient_result.shape
 #print gradient_result
 
-from vol_conv.perf.perf import perf_func_print_results
+from pylearn3dconv.perf.perf import perf_func_print_results
 perf_func_print_results("dnn_pool3d2d", dnn_3d_func, None, inputs)
 perf_func_print_results("dnn_pool3d2d_gradient", gradfunc, None, inputs)

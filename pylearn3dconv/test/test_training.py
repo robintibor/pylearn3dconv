@@ -3,26 +3,26 @@
 # http://stackoverflow.com/a/9806045/1469195
 import os
 import inspect
-from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
+from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentparentdir = os.path.dirname(os.path.dirname(currentdir))
 
 os.sys.path.insert(0,parentparentdir) 
 
-from vol_conv.volumetric_space import Conv3DSpace
-from vol_conv.layers.theano_3d_conv import Theano3dConv3dElemwise
-from vol_conv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
-from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
+from pylearn3dconv.volumetric_space import Conv3DSpace
+from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
+from pylearn3dconv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
+from pylearn3dconv.layers.cublas_3d_conv import CuBlasConv3dElemwise
 import numpy as np
 from pylearn2.models.mlp import IdentityConvNonlinearity
 import theano
 import theano.tensor as T
-from vol_conv.volumetric_dense_design_matrix import VolumetricDenseDesignMatrix
+from pylearn3dconv.volumetric_dense_design_matrix import VolumetricDenseDesignMatrix
 from pylearn2.training_algorithms.sgd import SGD
 from pylearn2.models.mlp import MLP, Softmax
 from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
-from vol_conv.test_data import generate_test_data
+from test_data import generate_test_data
 
 def test_training():
     inputs_shape = [100,7,6,5,3]

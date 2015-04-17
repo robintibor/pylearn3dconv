@@ -1,22 +1,22 @@
 #!/usr/bin/env python
-from vol_conv.test_data import generate_test_data
+from pylearn3dconv.test_data import generate_test_data
 from pylearn2.models.mlp import ConvElemwise, IdentityConvNonlinearity
 """ Transform this into test instead!!!"""
 import theano
 import theano.misc.pycuda_init
-from vol_conv.convolutions import  compute_out_shape, vectorized_conv
+from pylearn3dconv.convolutions import  compute_out_shape, vectorized_conv
 import numpy as np
 import argparse
 from pylearn2.space import Conv2DSpace
 import theano.tensor as T
 from perf import perf_func_print_results
-from vol_conv.layers.blas2d_manuel_conv import ConvElemwiseBlas
-from vol_conv.layers.cublas_3d_conv import CuBlasConv3dElemwise
-from vol_conv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
-from vol_conv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
-from vol_conv.layers.theano_3d_conv import Theano3dConv3dElemwise
-#from vol_conv.layers.cudnn_3d_conv import CuDnn
-from vol_conv.volumetric_space import Conv3DSpace
+from pylearn3dconv.layers.blas2d_manuel_conv import ConvElemwiseBlas
+from pylearn3dconv.layers.cublas_3d_conv import CuBlasConv3dElemwise
+from pylearn3dconv.layers.cudnn_3d_conv import CuDnnConv3dElemwise
+from pylearn3dconv.layers.theano_3d_2d_conv import Theano3d2dConv3dElemwise
+from pylearn3dconv.layers.theano_3d_conv import Theano3dConv3dElemwise
+#from pylearn3dconv.layers.cudnn_3d_conv import CuDnn
+from pylearn3dconv.volumetric_space import Conv3DSpace
 from numpy.random import RandomState
 import theano.sandbox.cuda
 import gc

@@ -2,8 +2,8 @@ from conv_3d import Conv3dElemwise
 import functools
 from pylearn2.linear.linear_transform import LinearTransform as P2LT
 from theano.sandbox.cuda.basic_ops import (gpu_contiguous, gpu_alloc_empty)
-#from vol_conv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
-from vol_conv.theano_dnn_first_try.theano_dnn_conv import dnn_3dconv
+#from pylearn3dconv.theano_dnn_first_try.theano_dnn_conv import GpuDnn3dConv, GpuDnnConv3dDesc
+from pylearn3dconv.theano_dnn_first_try.theano_dnn_conv import dnn_3dconv
 
 class CuDnn3dConv():
     op_axes = ('b', 'c', 0, 1, 2)
