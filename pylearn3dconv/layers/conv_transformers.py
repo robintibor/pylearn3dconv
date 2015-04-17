@@ -5,6 +5,7 @@ from theano.tensor.nnet.Conv3D import Conv3D
 from pylearn3dconv.theanodnn.conv import dnn_3dconv
 import theano.tensor.nnet.conv3d2d
 import functools
+from pylearn3dconv.volumetric_space import Conv3DSpace
 
 class Conv3dTransformer():
     """ Transforms from input to convolved input and adds bias.
@@ -17,21 +18,14 @@ class Conv3dTransformer():
 
     def lmul(self, x):
         assert x.ndim == 5
-        input_axes = self.input_axes
-        assert len(input_axes) == 5
-        if tuple(input_axes) != self.op_axes:
-            # convert from input axes to op_axes
-            reshuffle_arr = [input_axes.index(self.op_axes[i]) for i in xrange(5)]
-            x = x.dimshuffle(*reshuffle_arr)
+        assert len(self.input_axes) == 5
+        assert len(self.output_axes) == 5
+        if tuple(self.input_axes) != self.op_axes:
+            x = Conv3DSpace.convert(x, self.input_axes, self.op_axes)
+    
         rval = self.conv_and_add_bias(x)
-
-        output_axes = self.output_axes
-        assert len(output_axes) == 5
-
-        if tuple(output_axes) != self.op_axes:
-            # convert from op axes to output axes
-            reshuffle_arr = [self.op_axes.index(output_axes[i]) for i in xrange(5)]
-            rval = rval.dimshuffle(*reshuffle_arr)
+        if tuple(self.output_axes) != self.op_axes:
+            rval = Conv3DSpace.convert(rval, self.op_axes, self.output_axes)
         return rval
     
     def conv_and_add_bias(self, x):
