@@ -70,7 +70,7 @@ from theano.sandbox.cuda.basic_ops import (as_cuda_ndarray_variable,
                                            gpu_from_host)
 from theano.sandbox.cuda.dnn import GpuDnnConv, GpuDnnConvDesc
 from numpy.random import RandomState
-from pylearn3dconv.theano_dnn_first_try.theano_dnn_conv import GpuDnnPool3dDesc
+from pylearn3dconv.theanodnn3d.theano_dnn_conv import GpuDnnPool3dDesc
 
 import numpy as np
 
