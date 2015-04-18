@@ -2,6 +2,9 @@ import theano.tensor as T
 from theano.sandbox.cuda.dnn import dnn_pool
 
 def dnn_pool3d2d(inputs, pool_shape, pool_stride, image_shape, mode='max'):
+    """ Pool first all time-slices, so 2d-poolings over width and height.
+    Then do a 1dpooling over the time (done as fake2d pooling with pooling shape
+    1 for the ignored dimension."""
     for i in xrange(3):
         assert pool_shape[i] <= image_shape[i], ("pool shape should be less"
             " or equal than image shape, {:d} > {:d} for "
