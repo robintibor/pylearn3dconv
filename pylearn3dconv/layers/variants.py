@@ -1,6 +1,6 @@
 from pylearn3dconv.layers.base import Conv3dElemwise
 from pylearn3dconv.layers.conv_transformers import (CuDnn3dConv, CuBlas3dConv,
-    Theano3dConv, Theano3d2dConv)
+    Theano3dConv, Theano3d2dConv, Theano3dFFT)
 from pylearn3dconv.layers.pool_transformers import CudnnPoolTransformer
 
 class CuDnnConv3dElemwise(Conv3dElemwise):
@@ -17,4 +17,8 @@ class Theano3dConv3dElemwise(Conv3dElemwise):
 
 class Theano3d2dConv3dElemwise(Conv3dElemwise):
     conv_transformer=Theano3d2dConv
+    pool_transformer=CudnnPoolTransformer
+
+class TheanoFFTConv3dElemwise(Conv3dElemwise):
+    conv_transformer=Theano3dFFT
     pool_transformer=CudnnPoolTransformer

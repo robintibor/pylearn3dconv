@@ -5,7 +5,8 @@ import numpy as np
 from pylearn2.space import Conv2DSpace
 import theano.tensor as T
 from pylearn3dconv.layers.variants import (CuBlasConv3dElemwise,
-    CuDnnConv3dElemwise, Theano3d2dConv3dElemwise, Theano3dConv3dElemwise)
+    CuDnnConv3dElemwise, Theano3d2dConv3dElemwise, Theano3dConv3dElemwise,
+    TheanoFFTConv3dElemwise)
 from pylearn3dconv.volumetric_space import Conv3DSpace
 from numpy.random import RandomState
 from pylearn3dconv.test import test_function
@@ -105,13 +106,15 @@ def create_3d_fprops(inputs_shape, filters, bias, filters_stride,
         ('Blas3d', CuBlasConv3dElemwise), 
         ('Cudnn 3d', CuDnnConv3dElemwise),
         ('Theano 3d', Theano3dConv3dElemwise),
-        ('Theano 3d2d', Theano3d2dConv3dElemwise)]
+        ('Theano 3d2d', Theano3d2dConv3dElemwise),
+        ('Theano FFT', TheanoFFTConv3dElemwise)]
     for name_layer in names_layers:
         name = name_layer[0]
         layer_class = name_layer[1]
         # flip filters, only for theano3d2d as it computes convolution, 
         # others compute cross correlation
-        if layer_class != Theano3d2dConv3dElemwise:
+        if (layer_class != Theano3d2dConv3dElemwise and 
+            layer_class != TheanoFFTConv3dElemwise):
             this_filters = filters
         else:
             this_filters = filters_flipped

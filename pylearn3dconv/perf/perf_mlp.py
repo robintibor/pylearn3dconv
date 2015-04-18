@@ -3,7 +3,8 @@ from numpy.random import RandomState
 import numpy as np
 from pylearn3dconv.volumetric_space import Conv3DSpace
 from pylearn3dconv.layers.variants import CuDnnConv3dElemwise,\
-    CuBlasConv3dElemwise, Theano3dConv3dElemwise, Theano3d2dConv3dElemwise
+    CuBlasConv3dElemwise, Theano3dConv3dElemwise, Theano3d2dConv3dElemwise,\
+    TheanoFFTConv3dElemwise
 from pylearn2.models.mlp import MLP, IdentityConvNonlinearity, ConvElemwise
 import theano.tensor as T
 from pylearn3dconv.perf import perf_func_print_results
@@ -144,6 +145,7 @@ _layername_to_class_dict = {
         'cublas': CuBlasConv3dElemwise,
         'theano3d': Theano3dConv3dElemwise,
         'theano3d2d': Theano3d2dConv3dElemwise,
+        'theanofft': TheanoFFTConv3dElemwise,
         '2d': ConvElemwise
     }
 
