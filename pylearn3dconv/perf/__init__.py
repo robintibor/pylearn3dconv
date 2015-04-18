@@ -12,7 +12,8 @@ def perf_func(func, correct_result, *func_args):
     ## 1 second warmup before actual computation
     warm_up_time = 0
     warm_up_runs = 0
-    while (warm_up_time < 1 and warm_up_runs < 50):
+    while ((warm_up_time < 1 and warm_up_runs < 50) or
+            warm_up_runs < 2):
         start = timer()
         #print("memory before warmup call: {:5.1f} MB".format( 
         #    theano.sandbox.cuda.mem_info()[0] / (1024.0 ** 2)))
@@ -32,7 +33,8 @@ def perf_func(func, correct_result, *func_args):
     result = None
     while ((total_running_time < 1 and runs < 100) or 
         (total_running_time < 2 and runs < 30) or
-        (total_running_time < 5 and runs < 20)):
+        (total_running_time < 5 and runs < 20)
+        or (total_running_time < 60 and runs < 5)):
         del result
         gc.collect()#make sure memory is empty
         #print("memory before real call:   {:5.1f} MB".format( 

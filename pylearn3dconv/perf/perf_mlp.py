@@ -35,11 +35,18 @@ class MLPPerf():
             print("Frames: {:d}".format(frames))
             self.inputs_shape[3] = frames
             self.grad_func = self.create_mlp_grad_func()
-            inputs = generate_inputs(self.rng, self.inputs_shape, self.layer_class)
+            inputs = self.generate_inputs()
             runtime_sec, iterations = perf_func_print_results(self.modelname,
                 self.grad_func, None, inputs)
             self.runtime_ms.append(runtime_sec * 1000.0 / iterations)
             
+    def generate_inputs(self):
+        inputs_shape = self.inputs_shape
+        if (self.layer_class == ConvElemwise):
+            # eliminate time dimension
+            inputs_shape = inputs_shape[0:3] + [inputs_shape[4]]
+        inputs = self.rng.normal(size=inputs_shape).astype(np.float32)
+        return inputs
     
     def create_mlp_grad_func(self):
         inputs = (ftensor5() if self.layer_class != ConvElemwise 
@@ -63,6 +70,7 @@ class MLPPerf():
             self.adapt_for_2d_conv(layer_args)
         else:
             self.adapt_for_time_dim(layer_args)
+        print layer_args
             
         for i, layer_arg in enumerate(layer_args):
             # maybe time dim smaller 
@@ -91,6 +99,7 @@ class MLPPerf():
     
     def adapt_for_time_dim(self, layer_args):
         # input shape is b012c
+        # all shapes/strides here refer to the time dimension
         inshape = self.inputs_shape[3]
         for larg in layer_args:
             # Adjust kernel if necessary
@@ -106,14 +115,6 @@ class MLPPerf():
                 pool_stride = larg['pool_stride'][2]
                 inshape = ((inshape - pool_shape) // pool_stride) + 1
         
-        
-
-def generate_inputs(rng, inputs_shape, layer_class):
-    inputs = rng.normal(size=inputs_shape).astype(np.float32)
-    if (layer_class == ConvElemwise):
-        inputs = inputs[:,:,:,0,:] # eliminate time/3rd dimension
-    return inputs
-
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
         description="""Performance experiments for MLPs of 3d convolution layers.
