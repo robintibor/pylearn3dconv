@@ -1,0 +1,74 @@
+{
+    simple: [
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [1,1,1],
+            pool_type: !!null '',
+            output_channels: 32,
+        },
+    ],
+    twolayer: [
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [1,1,1],
+            pool_type: !!null '',
+            output_channels: 32,
+        },
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [1,1,1],
+            pool_type: !!null '',
+            output_channels: 32,
+        }
+    ],
+    fake2d: [
+        {
+            kernel_shape: [5,5,1],
+            kernel_stride: [1,1,1],
+            pool_type: !!null '',
+            output_channels: 32,
+        },
+        {
+            kernel_shape: [5,5,1],
+            kernel_stride: [1,1,1],
+            pool_type: !!null '',
+            output_channels: 32,
+        }
+    ],
+    twolayerpool: [
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [1,1,1],
+            pool_type: 'max',
+            pool_shape: [2,2,2],
+            pool_stride: [2,2,2],
+            output_channels: 32,
+        },
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [1,1,1],
+            pool_type: 'max',
+            pool_shape: [2,2,2],
+            pool_stride: [2,2,2],
+            output_channels: 32,
+        }
+    ],
+    fake2dpool: [
+        {
+            kernel_shape: [5,5,1],
+            kernel_stride: [1,1,1],
+            pool_type: 'max',
+            pool_shape: [2,2,1],
+            pool_stride: [2,2,1],
+            output_channels: 32,
+        },
+        {
+            kernel_shape: [5,5,1],
+            kernel_stride: [1,1,1],
+            pool_type: 'max',
+            pool_shape: [2,2,1],
+            pool_stride: [2,2,1],
+            output_channels: 32,
+        }
+    ],
+}

@@ -29,8 +29,8 @@ class CudnnPoolTransformer(PoolTransformer):
         if pool_type =='mean': 
             pool_type = 'average'
         return dnn_pool3d2d(inputs=inputs,
-                           pool_shape=self.pool_shape,
-                           pool_stride=self.pool_stride,
-                           image_shape=self.image_shape,
+                           pool_shape=tuple(self.pool_shape),
+                           pool_stride=tuple(self.pool_stride),
+                           image_shape=tuple(self.image_shape),
                            mode=pool_type)
         

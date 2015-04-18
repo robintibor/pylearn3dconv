@@ -5,6 +5,7 @@ import gc
 def perf_func_print_results(name, func, correct_result, *func_args):
     runtime_in_sec, iterations = perf_func(func, correct_result, *func_args)
     print_results(name, runtime_in_sec, iterations)
+    return runtime_in_sec, iterations
 
 def perf_func(func, correct_result, *func_args):
     gc.collect()#make sure memory is empty
