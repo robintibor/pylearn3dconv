@@ -110,8 +110,6 @@ class GpuDnnConv3dDesc(GpuOp):
     def c_code_cache_version(self):
         return (2, version())
 
-
-
 class GpuDnn3dConv(DnnBase, COp):
     """
     The forward convolution.
