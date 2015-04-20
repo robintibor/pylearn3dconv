@@ -2,9 +2,11 @@ from pylearn3dconv.test import ftensor5
 from numpy.random import RandomState
 import numpy as np
 from pylearn3dconv.volumetric_space import Conv3DSpace
-from pylearn3dconv.layers.variants import CuDnnConv3dElemwise,\
-    CuBlasConv3dElemwise, Theano3dConv3dElemwise, Theano3d2dConv3dElemwise,\
-    TheanoFFTConv3dElemwise
+
+from pylearn3dconv.layers.conv_transformers import (CuDnn3dConv, CuBlas3dConv,
+    Theano3dConv, Theano3d2dConv)
+from pylearn3dconv.layers.pool_transformers import CudnnPoolTransformer
+
 from pylearn2.models.mlp import MLP, IdentityConvNonlinearity, ConvElemwise
 import theano.tensor as T
 from pylearn3dconv.perf import perf_func_print_results
@@ -14,18 +16,19 @@ from pylearn2.config import yaml_parse
 import os
 import argparse
 from pylearn2.space import Conv2DSpace
+from pylearn3dconv.layers.base import Conv3dElemwise
 
-def perf_mlp(inputs_shape, layer_class, modelname, minframes, maxframes):
+def perf_mlp(inputs_shape, conv_class, modelname, minframes, maxframes):
     rng = RandomState(np.uint32(hash('perfthemlp')))
-    print "Perfing {:s}".format(layer_class.__name__)
-    mlp_perfer = MLPPerf(inputs_shape, layer_class, modelname, minframes,
+    print "Perfing {:s}".format(conv_class.__name__)
+    mlp_perfer = MLPPerf(inputs_shape, conv_class, modelname, minframes,
         maxframes, rng)
     mlp_perfer.perf()
     print (range(minframes, maxframes + 1))
     print(mlp_perfer.runtime_ms)
 
 class MLPPerf():
-    def __init__(self, inputs_shape, layer_class, modelname, minframes,
+    def __init__(self, inputs_shape, conv_class, modelname, minframes,
         maxframes, rng):
         self.__dict__.update(locals())
         del self.self
@@ -43,14 +46,14 @@ class MLPPerf():
             
     def generate_inputs(self):
         inputs_shape = self.inputs_shape
-        if (self.layer_class == ConvElemwise):
+        if (self.conv_class == ConvElemwise):
             # eliminate time dimension
             inputs_shape = inputs_shape[0:3] + [inputs_shape[4]]
         inputs = self.rng.normal(size=inputs_shape).astype(np.float32)
         return inputs
     
     def create_mlp_grad_func(self):
-        inputs = (ftensor5() if self.layer_class != ConvElemwise 
+        inputs = (ftensor5() if self.conv_class != ConvElemwise 
             else T.ftensor4())
         mlp = self.construct_model()
         result = mlp.fprop(inputs)
@@ -67,23 +70,21 @@ class MLPPerf():
         layers = []
         
         # adapt in case of 2d layer
-        if (self.layer_class == ConvElemwise):
+        if (self.conv_class == ConvElemwise):
             self.adapt_for_2d_conv(layer_args)
         else:
             self.adapt_for_time_dim(layer_args)
         print layer_args
             
         for i, layer_arg in enumerate(layer_args):
-            # maybe time dim smaller 
-            layer = self.layer_class(irange=1e-3, layer_name='test_' + str(i),
-                nonlinearity=IdentityConvNonlinearity(), **layer_arg)
+            layer = self.construct_layer(layer_arg, i)
             layers.append(layer)
         input_space = self.create_input_space()
         mlp = MLP(input_space=input_space, layers=layers)
         return mlp
         
     def create_input_space(self):
-        if (self.layer_class != ConvElemwise):
+        if (self.conv_class != ConvElemwise):
             return Conv3DSpace(self.inputs_shape[1:4], 
                 num_channels=self.inputs_shape[4], axes=('b',0,1,2,'c'))
         else:
@@ -115,7 +116,22 @@ class MLPPerf():
                 pool_shape = larg['pool_shape'][2]
                 pool_stride = larg['pool_stride'][2]
                 inshape = ((inshape - pool_shape) // pool_stride) + 1
-        
+
+    def construct_layer(self, layer_arg, i):
+        # maybe time dim smaller 
+        if (self.conv_class != ConvElemwise):
+            layer = Conv3dElemwise(irange=1e-3, layer_name='test_' + str(i),
+                nonlinearity=IdentityConvNonlinearity(), 
+                conv_transformer_class=self.conv_class,
+                pool_transformer_class=CudnnPoolTransformer,
+                **layer_arg)
+        else:
+            layer = ConvElemwise(irange=1e-3, layer_name='test_' + str(i),
+                nonlinearity=IdentityConvNonlinearity(), 
+                **layer_arg)
+        return layer
+    
+    
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
         description="""Performance experiments for MLPs of 3d convolution layers.
@@ -125,9 +141,9 @@ def parse_command_line_arguments():
                         dest='inputs_shape',
                         help='''Shape of the inputs b 0 1 2 c format.
                         Time dimension will be determined by timemax parameter''')
-    parser.add_argument('--layer', default='cudnn', dest='layername',
-                        choices=_layername_to_class_dict.keys(),
-                        help='''Layer to perf.''')
+    parser.add_argument('--conv', default='cudnn', dest='convname',
+                        choices=_convname_to_class_dict.keys(),
+                        help='''Convolution type to perf.''')
     parser.add_argument('--model', default='simple', dest='modelname',
                     choices=['simple', 'twolayer', 'twolayerpool', 'twolayerstride'],
                     help='''Model to perf.''')
@@ -137,23 +153,22 @@ def parse_command_line_arguments():
         second(time) dimension.''', default=7)
     args = parser.parse_args()
     args.inputs_shape = [int(s) for s in args.inputs_shape]
-    args.layer_class = layername_to_class(args.layername)
+    args.conv_class = conv_to_class(args.convname)
     return args
 
-_layername_to_class_dict = {
-        'cudnn': CuDnnConv3dElemwise,
-        'cublas': CuBlasConv3dElemwise,
-        'theano3d': Theano3dConv3dElemwise,
-        'theano3d2d': Theano3d2dConv3dElemwise,
-        'theanofft': TheanoFFTConv3dElemwise,
-        '2d': ConvElemwise
+_convname_to_class_dict = {
+        'cudnn': CuDnn3dConv,
+        'cublas': CuBlas3dConv,
+        'theano3d': Theano3dConv,
+        'theano3d2d': Theano3d2dConv,
+        '2d': ConvElemwise # this is a layer class, will be handled differently
     }
 
-def layername_to_class(name):
-    return _layername_to_class_dict[name]
+def conv_to_class(name):
+    return _convname_to_class_dict[name]
 
 if __name__ == "__main__":
     #--inputs 32 80 80 40 3
     args = parse_command_line_arguments()
-    perf_mlp(args.inputs_shape, args.layer_class, args.modelname,
+    perf_mlp(args.inputs_shape, args.conv_class, args.modelname,
         args.minframes, args.maxframes)

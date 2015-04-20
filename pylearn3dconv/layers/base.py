@@ -6,22 +6,21 @@ from pylearn3dconv.volumetric_space import Conv3DSpace
 import numpy as np
 import theano.tensor as T
 from theano.compat import OrderedDict
-from pylearn3dconv.theanodnn.pool import dnn_pool3d2d
 
 logger = logging.getLogger(__name__)
 
 default_seed = hash('tobipuma') % 4294967295 # good seed is important ;)
 
 def make_conv_3d(irange, input_space, output_space,
-        kernel_shape, kernel_stride, conv_op, init_bias=0., rng=None):
+        kernel_shape, kernel_stride, conv_class, init_bias=0., rng=None):
     rng = make_np_rng(rng, default_seed, which_method='uniform')
     weights_shape = _get_weights_shape(out_channels = output_space.num_channels,
         kernel_shape=kernel_shape, in_channels=input_space.num_channels, 
-        conv_op_axes = conv_op.op_axes)
+        conv_op_axes = conv_class.op_axes)
     
     W = sharedX(rng.uniform(-irange, irange, weights_shape))
     bias = sharedX(np.zeros(weights_shape[0]).astype('float32') + init_bias)
-    return conv_op(
+    return conv_class(
         filters=W,
         bias=bias,
         kernel_stride = kernel_stride,
@@ -74,15 +73,14 @@ class Conv3dElemwise(Layer):
     
     """
 
-    conv_transformer=None # should be overwritten by subclass
-    pool_transformer=None # should be overwritten by subclass
-
     def __init__(self,
                  output_channels,
                  kernel_shape,
                  kernel_stride,
                  layer_name,                 
                  nonlinearity,
+                 conv_transformer_class,
+                 pool_transformer_class,
                  irange,
                  init_bias=0.,
                  pool_type=None,
@@ -118,7 +116,7 @@ class Conv3dElemwise(Layer):
             output_space=self.detector_space,
             kernel_shape=self.kernel_shape,
             kernel_stride=self.kernel_stride,
-            conv_op=self.conv_transformer,
+            conv_class=self.conv_transformer_class,
             rng=rng)
 
     def initialize_output_space(self):
@@ -177,8 +175,8 @@ class Conv3dElemwise(Layer):
                         for i in xrange(3)]
 
         self.detector_space = Conv3DSpace(shape=output_shape,
-                                          num_channels=self.output_channels,
-                                          axes=self.conv_transformer.op_axes)
+                                      num_channels=self.output_channels,
+                                      axes=self.conv_transformer_class.op_axes)
 
         self.initialize_transformer(rng)
         if self.pool_type is not None:
@@ -194,7 +192,7 @@ class Conv3dElemwise(Layer):
 
     def initialize_pool_transformer(self):
         image_shape = self.detector_space.shape
-        self.pool_transformer = self.pool_transformer(
+        self.pool_transformer = self.pool_transformer_class(
             pool_shape=self.pool_shape, pool_stride=self.pool_stride,
             image_shape=image_shape, pool_type=self.pool_type, 
             input_axes=self.detector_space.axes)

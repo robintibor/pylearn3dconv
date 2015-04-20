@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 from pylearn3dconv.volumetric_space import Conv3DSpace
-from pylearn3dconv.layers.variants import (CuBlasConv3dElemwise,
-    CuDnnConv3dElemwise, Theano3dConv3dElemwise)
+
+from pylearn3dconv.layers.conv_transformers import (CuDnn3dConv, CuBlas3dConv,
+    Theano3dConv)
+from pylearn3dconv.layers.pool_transformers import CudnnPoolTransformer
 import numpy as np
 from pylearn2.models.mlp import IdentityConvNonlinearity
 import theano
@@ -12,6 +14,7 @@ from pylearn2.models.mlp import MLP, Softmax
 from pylearn2.format.target_format import OneHotFormatter
 from numpy.random import RandomState
 from pylearn3dconv.test import generate_test_data
+from pylearn3dconv.layers.base import Conv3dElemwise
 
 def test_training():
     #b 0 1 2 c format
@@ -76,29 +79,29 @@ def test_training():
 
 def expect_results(inputs_shape, filters_shape, kernel_stride, 
         pool_type, pool_shape, pool_stride, expected_results):
-    layers = [Theano3dConv3dElemwise, CuBlasConv3dElemwise, CuDnnConv3dElemwise]
-    for layer in layers:
+    conv_classes = [Theano3dConv, CuBlas3dConv, CuDnn3dConv]
+    for conv_class in conv_classes:
         expect_results_for_layer(inputs_shape, filters_shape, kernel_stride,
-            pool_type, pool_shape, pool_stride, layer, expected_results)
+            pool_type, pool_shape, pool_stride, conv_class, expected_results)
 
 def expect_results_for_layer(inputs_shape, filters_shape, kernel_stride, 
-        pool_type, pool_shape, pool_stride, conv_layer_class, expected_results):
+        pool_type, pool_shape, pool_stride, conv_class, expected_results):
     # a great seed is half the work :)
     rng = RandomState(hash('tobipuma') % 4294967295)
     inputs, filters, bias = generate_test_data(rng, inputs_shape, filters_shape)
     mlp_fprop, train_set, valid_set, test_set, algorithm = setup_training(
         inputs, filters, bias, kernel_stride, pool_type, pool_shape, 
-        pool_stride, conv_layer_class)
+        pool_stride, conv_class)
     run_training(mlp_fprop, train_set, valid_set, test_set, algorithm,
         expected_results)
-    print conv_layer_class.__name__ + " - Ok."
+    print conv_class.__name__ + " - Ok."
 
 def setup_training(inputs, filters, bias, kernel_stride, pool_type,
-    pool_shape, pool_stride,conv_layer_class):
+    pool_shape, pool_stride,conv_class):
     """ Setup model, prediction function, algorithm for training"""
     train_set, valid_set, test_set = generate_datasets(inputs)
     mlp = construct_model(inputs.shape, filters, bias, kernel_stride, 
-        pool_type, pool_shape, pool_stride, conv_layer_class)
+        pool_type, pool_shape, pool_stride, conv_class)
     mlp_fprop = construct_predict_function(mlp)
     algorithm = create_algorithm(mlp, train_set)
     
@@ -119,12 +122,14 @@ def generate_datasets(inputs):
     return train_set, valid_set, test_set
 
 def construct_model(inputs_shape, filters, bias, kernel_stride,
-    pool_type, pool_shape, pool_stride,  conv_layer_class):
+    pool_type, pool_shape, pool_stride,  conv_class):
     conv_3d_input_space = Conv3DSpace(inputs_shape[1:4], 
         num_channels=inputs_shape[4], axes=('b',0,1,2,'c'))
-    conv_3d_layer = conv_layer_class(output_channels=filters.shape[0], 
+    conv_3d_layer = Conv3dElemwise(output_channels=filters.shape[0], 
         kernel_shape=filters.shape[1:4], kernel_stride = kernel_stride,
         layer_name='conv3d_lin', nonlinearity=IdentityConvNonlinearity(),
+        conv_transformer_class = conv_class, 
+        pool_transformer_class = CudnnPoolTransformer,
         irange=0.001, pool_type=pool_type, pool_shape=pool_shape,
         pool_stride=pool_stride)
     softmax_layer = Softmax(max_col_norm=2, layer_name='y',
