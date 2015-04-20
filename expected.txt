@@ -1,8 +1,0 @@
-python perf_convs.py --inputs 15 20 16 15 3 --filters 7 3 6 2 3
-Theano Blas 3d            runtime per iteration ( 494 iterations):   2.0269ms
-Theano 3d FFT             runtime per iteration ( 500 iterations):   2.0019ms
-Theano 3d2d               runtime per iteration ( 475 iterations):   2.1065ms
-Theano 3d                 runtime per iteration (  30 iterations):  58.2931ms
-Python Vectorized         runtime per iteration (  30 iterations):  34.8676ms
-Cudamat Vectorized        runtime per iteration (  30 iterations):  37.8641ms
-Theano Mul Vectorized     runtime per iteration (  32 iterations):  31.9373ms
