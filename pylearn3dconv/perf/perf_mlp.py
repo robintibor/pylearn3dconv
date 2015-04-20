@@ -129,7 +129,7 @@ def parse_command_line_arguments():
                         choices=_layername_to_class_dict.keys(),
                         help='''Layer to perf.''')
     parser.add_argument('--model', default='simple', dest='modelname',
-                    choices=['simple', 'twolayer', 'twolayerpool'],
+                    choices=['simple', 'twolayer', 'twolayerpool', 'twolayerstride'],
                     help='''Model to perf.''')
     parser.add_argument('--minframes', type=int, help='''Minimum dim for 
         second(time) dimension.''', default=6)

@@ -39,4 +39,18 @@
             output_channels: 32,
         }
     ],
+    twolayerstride: [
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [5,5,5],
+            pool_type: !!null '',
+            output_channels: 32,
+        },
+        {
+            kernel_shape: [5,5,5],
+            kernel_stride: [5,5,5],
+            pool_type: !!null '',
+            output_channels: 32,
+        }
+    ],
 }
