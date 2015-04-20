@@ -83,21 +83,3 @@ class Theano3d2dConv(Conv3dTransformer):
             result = result[:,::kernel_stride[2], :, ::kernel_stride[0],
                 ::kernel_stride[1]]
         return result
-
-class Theano3dFFT(Conv3dTransformer):
-    op_axes = ('b', 'c', 0, 1, 2)
-    def conv_and_add_bias(self, x):
-        rval = theano.sandbox.cuda.fftconv.conv3d_fft(x, 
-            self.filters, pad_last_dim=True)
-        rval = self._subsample(rval, tuple(self.kernel_stride))
-        rval = rval + self.bias.dimshuffle('x', 0, 'x', 'x', 'x')
-        return rval
-    
-    def _subsample(self, result, kernel_stride):
-        """ Subsample result with stride if necessary.
-        Expects kernel_stride to be a tuple."""
-        assert isinstance(kernel_stride, tuple)
-        if (kernel_stride != (1,1,1)):
-            result = result[:,:,::kernel_stride[0], ::kernel_stride[1],
-                ::kernel_stride[2]]
-        return result
