@@ -72,9 +72,9 @@ def loop_conv(X, W):
     Actually performing cross correlation, not convolution. 
     Assumes bc012 input"""
     # Go over all five dimensions 
-    # (#batches x #height x #width x #dur/length x #channels)
+    # (#batches x #channels x #height x #width x #dur/length )
     # with filter that has
-    # #filters x #height x #width x #dur/length x #channels
+    # #filters x #channels x #height x #width x #dur/length 
     num_filters = W.shape[0]
     filt_channels = W.shape[1]
     filt_height = W.shape[2]
