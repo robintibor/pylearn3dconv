@@ -28,6 +28,35 @@ from theano.sandbox.cuda.nvcc_compiler import NVCC_compiler
 from theano.sandbox.cuda.dnn import dnn_available, version, DnnBase, \
     DnnVersion, ensure_float, _one, _zero
 
+def dnn_3dconv(img, kerns,  subsample=(1, 1),
+             conv_mode='conv'):
+    """
+    GPU 3d convolution using cuDNN from NVIDIA.
+
+    The memory layout to use is 'bc012', that is 'batch', 'channel',
+    'first dim', 'second dim', 'third dim' in that order.
+
+    :param img: images to do the convolution over
+    :param kerns: convolution filters
+    :param subsample: perform subsampling of the output (default: (1, 1))
+
+
+    :warning: The cuDNN library only works with GPU that have a compute
+      capability of 3.0 or higer.  This means that older GPU will not
+      work with this Op.
+    """
+    img = gpu_contiguous(img)
+    kerns = gpu_contiguous(kerns)
+    desc = GpuDnnConv3dDesc(subsample=tuple(subsample), 
+            conv_mode=conv_mode)()
+    desc_op = desc.owner.op
+    out_shp = GpuDnn3dConv.get_out_shape(img.shape, kerns.shape,
+                                           desc_op.subsample)
+        
+        
+    out = gpu_alloc_empty(*out_shp)
+    return GpuDnn3dConv()(img, kerns, out, desc)
+
 class GpuDnnConv3dDesc(GpuOp):
     """This Op builds a 3d convolution descriptor for use in the other
     convolution operations.
@@ -359,35 +388,6 @@ class GpuDnn3dConvGradI(DnnBase, COp):
     def infer_shape(self, node, shape):
         return [shape[2]]
 
-
-def dnn_3dconv(img, kerns,  subsample=(1, 1),
-             conv_mode='conv'):
-    """
-    GPU 3d convolution using cuDNN from NVIDIA.
-
-    The memory layout to use is 'bc012', that is 'batch', 'channel',
-    'first dim', 'second dim', 'third dim' in that order.
-
-    :param img: images to do the convolution over
-    :param kerns: convolution filters
-    :param subsample: perform subsampling of the output (default: (1, 1))
-
-
-    :warning: The cuDNN library only works with GPU that have a compute
-      capability of 3.0 or higer.  This means that older GPU will not
-      work with this Op.
-    """
-    img = gpu_contiguous(img)
-    kerns = gpu_contiguous(kerns)
-    desc = GpuDnnConv3dDesc(subsample=tuple(subsample), 
-            conv_mode=conv_mode)()
-    desc_op = desc.owner.op
-    out_shp = GpuDnn3dConv.get_out_shape(img.shape, kerns.shape,
-                                           desc_op.subsample)
-        
-        
-    out = gpu_alloc_empty(*out_shp)
-    return GpuDnn3dConv()(img, kerns, out, desc)
 
 
 
